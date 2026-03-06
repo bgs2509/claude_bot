@@ -21,6 +21,7 @@ from aiogram.types import FSInputFile
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 PROJECTS_DIR = Path(os.getenv("PROJECTS_DIR", "/home/claude/projects"))
 WHISPER_MODEL = os.getenv("WHISPER_MODEL", "base")
+WHISPER_DEVICE = os.getenv("WHISPER_DEVICE", "cpu")
 TTS_VOICE = os.getenv("TTS_VOICE", "ru-RU-DmitryNeural")
 MAX_MESSAGE_LEN = 4000
 CLAUDE_TIMEOUT = int(os.getenv("CLAUDE_TIMEOUT", "600"))  # 10 минут
@@ -113,7 +114,7 @@ def get_whisper_model():
     if _whisper_model is None:
         try:
             from faster_whisper import WhisperModel
-            _whisper_model = WhisperModel(WHISPER_MODEL, device="cpu", compute_type="int8")
+            _whisper_model = WhisperModel(WHISPER_MODEL, device=WHISPER_DEVICE, compute_type="int8")
             log.info(f"Whisper модель '{WHISPER_MODEL}' загружена")
         except ImportError as e:
             log.warning("faster-whisper не загружен, STT недоступен: %s", e)
@@ -597,7 +598,7 @@ async def main():
     log.info("Claude Code Telegram Bot запущен")
     log.info(f"Проекты: {PROJECTS_DIR}")
     log.info(f"Пользователей: {len(USERS_CONFIG) or 'без ограничений'}")
-    log.info(f"Whisper модель: {WHISPER_MODEL}")
+    log.info(f"Whisper модель: {WHISPER_MODEL} (device={WHISPER_DEVICE})")
     log.info(f"TTS голос: {TTS_VOICE}")
     await dp.start_polling(bot)
 
