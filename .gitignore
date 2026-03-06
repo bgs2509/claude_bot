@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+venv/
+.venv/
+*.egg-info/
+
+# Секреты
+.env
+.env.local
+.env.production
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+
+# Логи и временные файлы
+*.log
+bot.pid
+*.tmp
+*.mp3
+*.wav
+*.ogg
+
+# Claude Code локальные настройки
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
