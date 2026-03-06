@@ -12,6 +12,7 @@ from aiogram import types
 from aiogram.types import FSInputFile
 
 from claude_bot.config import Settings
+from claude_bot.services.format_telegram import markdown_to_telegram_html
 from claude_bot.state import AppState
 
 log = logging.getLogger("claude-bot")
@@ -19,6 +20,13 @@ log = logging.getLogger("claude-bot")
 MEDIA_EXTENSIONS = {
     ".png", ".jpg", ".jpeg", ".gif", ".webp",
     ".pdf", ".csv", ".xlsx", ".mp3", ".mp4",
+}
+
+# Маппинг коротких имён → полных model ID
+MODELS: dict[str, str] = {
+    "haiku": "claude-haiku-4-5-20251001",
+    "sonnet": "claude-sonnet-4-6",
+    "opus": "claude-opus-4-6",
 }
 
 
@@ -30,11 +38,8 @@ class ClaudeResponse:
     files: list[Path] = field(default_factory=list)
 
 
-def get_project_dir(uid: int, settings: Settings, state: AppState) -> Path:
-    """Рабочая директория проекта для пользователя."""
-    project = state.user_projects.get(uid)
-    if project:
-        return settings.projects_dir / project
+def get_project_dir(settings: Settings) -> Path:
+    """Рабочая директория для Claude."""
     return settings.projects_dir
 
 
@@ -62,7 +67,7 @@ async def run_claude(
     prompt: str, uid: int, settings: Settings, state: AppState
 ) -> ClaudeResponse:
     """Запустить Claude Code CLI и получить результат."""
-    cwd = get_project_dir(uid, settings, state)
+    cwd = get_project_dir(settings)
     cwd.mkdir(parents=True, exist_ok=True)
 
     # Подготовка _output/ и снимок медиа
@@ -79,11 +84,18 @@ async def run_claude(
         "--append-system-prompt",
         "ФОРМАТ ОТВЕТА: "
         "НИКОГДА не используй таблицы. "
-        "Вместо таблиц используй многоуровневые маркированные или нумерованные списки. "
-        "Форматирование: только plain text, списки и переносы строк. "
-        "Все создаваемые файлы (скриншоты, изображения, CSV, и т.д.) "
-        "сохраняй в папку _output/ в текущей директории.",
+        "Вместо таблиц используй маркированные или нумерованные списки. "
+        "Форматирование: plain text, списки, переносы строк. "
+        "Файлы сохраняй в _output/. "
+        "Пользователь общается через Telegram-бот. "
+        "Он может просить выполнить bash-команды (cd, ls, mkdir, git и любые другие) — выполняй их. "
+        "При смене директории сообщай текущий путь.",
     ]
+
+    # Модель пользователя
+    model_name = state.user_models.get(uid, "sonnet")
+    model_id = MODELS.get(model_name, MODELS["sonnet"])
+    cmd += ["--model", model_id]
 
     # Продолжить сессию если есть
     session_id = state.user_sessions.get(uid)
@@ -143,18 +155,27 @@ async def run_claude(
     return ClaudeResponse(text=result_text, session_id=sid, files=collected_files)
 
 
+async def _send_html_or_plain(message: types.Message, text: str) -> None:
+    """Отправить сообщение как HTML, при ошибке — plain text."""
+    formatted = markdown_to_telegram_html(text)
+    try:
+        await message.answer(formatted, parse_mode="HTML")
+    except Exception:
+        await message.answer(text)
+
+
 async def send_long(message: types.Message, text: str, max_len: int = 4000) -> None:
     """Отправка ответа. Если > max_len — первый чанк + .md файл."""
     if not text.strip():
         text = "(пустой ответ)"
 
     if len(text) <= max_len:
-        await message.answer(text)
+        await _send_html_or_plain(message, text)
         return
 
     # Первый чанк + файл с полным ответом
     preview = text[:max_len]
-    await message.answer(preview)
+    await _send_html_or_plain(message, preview)
 
     md_path = tempfile.mktemp(suffix=".md")
     with open(md_path, "w", encoding="utf-8") as f:

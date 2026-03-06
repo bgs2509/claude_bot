@@ -11,8 +11,8 @@ class AppState:
 
     # uid → session_id
     user_sessions: dict[int, str] = field(default_factory=dict)
-    # uid → имя проекта
-    user_projects: dict[int, str] = field(default_factory=dict)
+    # uid → короткое имя модели (haiku/sonnet/opus)
+    user_models: dict[int, str] = field(default_factory=dict)
     # uid → голосовой режим
     user_voice_mode: dict[int, bool] = field(default_factory=dict)
     # uid → {"date": "YYYY-MM-DD", "count": N}

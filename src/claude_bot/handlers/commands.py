@@ -7,26 +7,56 @@ from aiogram.filters import CommandStart, Command, CommandObject
 from aiogram.types import Message
 
 from claude_bot.config import Settings
+from claude_bot.services.claude import MODELS
 from claude_bot.state import AppState
 
 router = Router(name="commands")
 
 
 @router.message(CommandStart())
-async def cmd_start(message: Message, settings: Settings, state: AppState, role: str) -> None:
+async def cmd_start(message: Message) -> None:
     await message.answer(
-        f"Claude Code Bot\n\n"
-        f"Роль: {role}\n"
-        f"Проект: {state.user_projects.get(message.from_user.id, '(по умолчанию)')}\n\n"
-        f"Просто отправь текст, голосовое или фото.\n\n"
-        f"Команды:\n"
-        f"/new — новая сессия\n"
-        f"/cancel — отменить запрос\n"
-        f"/session — ID сессии\n"
-        f"/project — список проектов\n"
-        f"/project <имя> — переключить проект\n"
-        f"/voice — вкл/выкл голосовые ответы\n"
-        f"/stats — статистика (admin)"
+        "Claude Code Bot\n\n"
+        "Отправь текст, голосовое или фото — Claude ответит.\n\n"
+        "/help — справка и список команд"
+    )
+
+
+@router.message(Command("help"))
+async def cmd_help(message: Message) -> None:
+    await message.answer(
+        "📖 <b>Как пользоваться ботом</b>\n\n"
+
+        "<b>Что можно отправлять:</b>\n"
+        "• Текст — любой вопрос или задача\n"
+        "• Голосовое — распознается и обработается\n"
+        "• Фото — текст извлечётся через OCR\n"
+        "• Файл — содержимое будет прочитано\n\n"
+
+        "<b>Команды бота:</b>\n"
+        "/new — новая сессия (сбросить контекст)\n"
+        "/cancel — отменить текущий запрос\n"
+        "/model — сменить модель (haiku / sonnet / opus)\n"
+        "/voice — вкл/выкл голосовые ответы\n"
+        "/status — текущее состояние\n"
+        "/usage — твоя статистика за сегодня\n"
+        "/stats — статистика всех (admin)\n\n"
+
+        "<b>Навигация и bash:</b>\n"
+        "Claude понимает любые команды прямо в чате:\n"
+        "• <code>ls</code> — список файлов\n"
+        "• <code>cd my-project</code> — перейти в проект\n"
+        "• <code>mkdir new-project && cd new-project</code>\n"
+        "• <code>pwd</code> — текущая директория\n"
+        "• <code>git init</code>, <code>git status</code>, ...\n\n"
+
+        "Или на естественном языке:\n"
+        "• «создай папку my-app и перейди в неё»\n"
+        "• «покажи содержимое текущей директории»\n\n"
+
+        "<b>Контекст</b> сохраняется между сообщениями. "
+        "/new — сбросить.",
+        parse_mode="HTML",
     )
 
 
@@ -48,51 +78,24 @@ async def cmd_cancel(message: Message, state: AppState) -> None:
         await message.answer("Нет активного запроса.")
 
 
-@router.message(Command("session"))
-async def cmd_session(message: Message, state: AppState) -> None:
-    sid = state.user_sessions.get(message.from_user.id, "нет сессии")
-    await message.answer(f"Session ID: {sid}")
-
-
-@router.message(Command("project"))
-async def cmd_project(message: Message, command: CommandObject, settings: Settings, state: AppState) -> None:
+@router.message(Command("model"))
+async def cmd_model(message: Message, command: CommandObject, state: AppState) -> None:
     uid = message.from_user.id
     args = command.args
 
     if not args:
-        if not settings.projects_dir.exists():
-            await message.answer(f"Директория проектов не найдена: {settings.projects_dir}")
-            return
-        projects = sorted(
-            d.name for d in settings.projects_dir.iterdir() if d.is_dir()
-        )
-        if not projects:
-            await message.answer(f"Нет проектов в {settings.projects_dir}")
-            return
-
-        current = state.user_projects.get(uid, "")
-        lines = []
-        for p in projects:
-            marker = " ◀" if p == current else ""
-            lines.append(f"  {p}{marker}")
-        await message.answer(
-            f"Проекты ({settings.projects_dir}):\n" + "\n".join(lines) +
-            "\n\nПереключить: /project <имя>"
-        )
+        current = state.user_models.get(uid, "sonnet")
+        names = " | ".join(MODELS.keys())
+        await message.answer(f"Модель: {current}\nДоступные: {names}")
         return
 
-    # Переключить проект
-    project_name = args.strip()
-    project_path = settings.projects_dir / project_name
-    if not project_path.exists():
-        project_path.mkdir(parents=True, exist_ok=True)
-        await message.answer(f"Создан и переключён на проект: {project_name}")
-    else:
-        await message.answer(f"Переключён на проект: {project_name}")
+    name = args.strip().lower()
+    if name not in MODELS:
+        await message.answer(f"Неизвестная модель. Доступные: {' | '.join(MODELS.keys())}")
+        return
 
-    state.user_projects[uid] = project_name
-    # Сбросить сессию при смене проекта
-    state.user_sessions.pop(uid, None)
+    state.user_models[uid] = name
+    await message.answer(f"Модель: {name}")
 
 
 @router.message(Command("voice"))
@@ -102,6 +105,40 @@ async def cmd_voice(message: Message, state: AppState) -> None:
     state.user_voice_mode[uid] = not current
     status = "включён" if not current else "выключен"
     await message.answer(f"Голосовой режим {status}")
+
+
+@router.message(Command("status"))
+async def cmd_status(message: Message, state: AppState, settings: Settings) -> None:
+    uid = message.from_user.id
+    model = state.user_models.get(uid, "sonnet")
+    session = state.user_sessions.get(uid, "нет")
+    voice = "вкл" if state.user_voice_mode.get(uid, False) else "выкл"
+    cwd = str(settings.projects_dir)
+
+    await message.answer(
+        f"Модель: {model}\n"
+        f"Сессия: {session}\n"
+        f"Голос: {voice}\n"
+        f"Директория: {cwd}"
+    )
+
+
+@router.message(Command("usage"))
+async def cmd_usage(message: Message, settings: Settings, state: AppState) -> None:
+    uid = message.from_user.id
+    count_data = state.user_daily_count.get(uid, {})
+    today = date.today().isoformat()
+    today_count = (
+        count_data.get("count", 0)
+        if count_data.get("date") == today
+        else 0
+    )
+
+    cfg = settings.users.get(str(uid))
+    limit = cfg.get("limit", 0) if cfg else 0
+    limit_str = str(limit) if limit else "∞"
+
+    await message.answer(f"Сегодня: {today_count} / {limit_str} сообщений")
 
 
 @router.message(Command("stats"))
