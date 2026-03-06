@@ -9,7 +9,7 @@ from claude_bot.services.claude import run_claude, send_long
 from claude_bot.services.speech import transcribe_voice
 from claude_bot.state import AppState
 
-from . import download_file, safe_delete, send_voice_if_enabled
+from . import download_file, safe_delete, send_files, send_voice_if_enabled
 
 router = Router(name="voice")
 
@@ -32,8 +32,10 @@ async def handle_voice(message: Message, settings: Settings, state: AppState) ->
 
     await waiting.edit_text(f"🎤 Распознано: {text}\n\n⏳ Claude думает...")
 
-    result = await run_claude(text, uid, settings, state)
-    await send_long(message, result, settings.max_message_len)
+    response = await run_claude(text, uid, settings, state)
+    await send_long(message, response.text, settings.max_message_len)
+    if response.files:
+        await send_files(message, response.files)
 
-    await send_voice_if_enabled(message, result, uid, settings, state)
+    await send_voice_if_enabled(message, response.text, uid, settings, state)
     await safe_delete(waiting)

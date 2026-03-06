@@ -11,7 +11,7 @@ from claude_bot.middlewares.auth import check_limit
 from claude_bot.services.claude import run_claude, send_long
 from claude_bot.state import AppState
 
-from . import safe_delete
+from . import safe_delete, send_files
 
 router = Router(name="document")
 
@@ -55,7 +55,9 @@ async def handle_document(message: Message, settings: Settings, state: AppState)
 
     await waiting.edit_text("⏳ Claude думает...")
 
-    result = await run_claude(prompt, uid, settings, state)
-    await send_long(message, result, settings.max_message_len)
+    response = await run_claude(prompt, uid, settings, state)
+    await send_long(message, response.text, settings.max_message_len)
+    if response.files:
+        await send_files(message, response.files)
 
     await safe_delete(waiting)
