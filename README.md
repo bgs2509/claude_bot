@@ -111,7 +111,19 @@ claude_bot/
 │       ├── speech.py          # transcribe_voice, synthesize_speech
 │       ├── ocr.py             # ocr_image
 │       └── storage.py         # SessionStorage (проекты, сессии, пользователи)
+├── CHANGELOG.md              # Журнал изменений
+├── CLAUDE.md                 # Инструкции для Claude Code
 ├── docs/
+│   ├── adr/                  # Архитектурные решения (ADR)
+│   │   ├── README.md         # Индекс и шаблон
+│   │   ├── 001-aiogram.md
+│   │   ├── 002-claude-code-cli.md
+│   │   ├── 003-faster-whisper.md
+│   │   ├── 004-edge-tts.md
+│   │   ├── 005-tesseract.md
+│   │   ├── 006-modular-architecture.md
+│   │   ├── 007-pydantic-settings.md
+│   │   └── 008-uv.md
 │   ├── USAGE.md               # Руководство пользователя
 │   └── DEPLOYMENT.md          # Развёртывание и администрирование
 └── scripts/
@@ -127,5 +139,7 @@ claude_bot/
 
 ## Документация
 
+- **[CHANGELOG.md](CHANGELOG.md)** — журнал изменений (v1.0.0 → v2.0.0)
+- **[docs/adr/](docs/adr/)** — архитектурные решения (ADR)
 - **[docs/USAGE.md](docs/USAGE.md)** — руководство пользователя: команды, типы ввода, модели, примеры, FAQ
 - **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** — развёртывание: VPS, hardening, Claude Code, systemd, бэкапы, MCP серверы, troubleshooting
