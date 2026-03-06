@@ -113,7 +113,7 @@ def get_whisper_model():
     if _whisper_model is None:
         try:
             from faster_whisper import WhisperModel
-            _whisper_model = WhisperModel(WHISPER_MODEL, compute_type="int8")
+            _whisper_model = WhisperModel(WHISPER_MODEL, device="cpu", compute_type="int8")
             log.info(f"Whisper модель '{WHISPER_MODEL}' загружена")
         except ImportError as e:
             log.warning("faster-whisper не загружен, STT недоступен: %s", e)
