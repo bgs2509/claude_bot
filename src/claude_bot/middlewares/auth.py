@@ -51,6 +51,16 @@ class AuthMiddleware(BaseMiddleware):
 
 def check_limit(uid: int, settings: Settings, state: AppState) -> bool:
     """Проверить дневной лимит сообщений. True = можно отправить."""
+    today = date.today().isoformat()
+    data = state.user_daily_count.get(uid, {"date": "", "count": 0})
+
+    if data["date"] != today:
+        data = {"date": today, "count": 0}
+
+    # Всегда инкрементируем счётчик (для /usage и /stats)
+    data["count"] += 1
+    state.user_daily_count[uid] = data
+
     cfg = settings.users.get(str(uid))
     if not cfg:
         return True
@@ -58,15 +68,4 @@ def check_limit(uid: int, settings: Settings, state: AppState) -> bool:
     if limit == 0:
         return True  # Безлимит
 
-    today = date.today().isoformat()
-    data = state.user_daily_count.get(uid, {"date": "", "count": 0})
-
-    if data["date"] != today:
-        data = {"date": today, "count": 0}
-
-    if data["count"] >= limit:
-        return False
-
-    data["count"] += 1
-    state.user_daily_count[uid] = data
-    return True
+    return data["count"] <= limit
