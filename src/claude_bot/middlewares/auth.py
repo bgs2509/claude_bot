@@ -5,18 +5,27 @@ from datetime import date
 from typing import Any
 
 from aiogram import BaseMiddleware
-from aiogram.types import Message, TelegramObject
+from aiogram.types import CallbackQuery, Message, TelegramObject
 
 from claude_bot.config import Settings
 from claude_bot.state import AppState
 
+if __name__ != "__never__":
+    from claude_bot.services.storage import SessionStorage
+
 
 class AuthMiddleware(BaseMiddleware):
-    """Проверяет доступ пользователя и пробрасывает settings/state в data."""
+    """Проверяет доступ пользователя и пробрасывает settings/state/storage в data."""
 
-    def __init__(self, settings: Settings, state: AppState) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        state: AppState,
+        storage: "SessionStorage | None" = None,
+    ) -> None:
         self.settings = settings
         self.state = state
+        self.storage = storage
 
     async def __call__(
         self,
@@ -24,18 +33,26 @@ class AuthMiddleware(BaseMiddleware):
         event: TelegramObject,
         data: dict[str, Any],
     ) -> Any:
-        # Пробрасываем зависимости в data
         data["settings"] = self.settings
         data["state"] = self.state
+        data["storage"] = self.storage
 
-        # Проверяем доступ только для Message
-        if isinstance(event, Message) and event.from_user:
-            uid = event.from_user.id
+        # Получить from_user из Message или CallbackQuery
+        user = None
+        if isinstance(event, Message):
+            user = event.from_user
+        elif isinstance(event, CallbackQuery):
+            user = event.from_user
+
+        if user:
+            uid = user.id
             if not self._is_allowed(uid):
-                await event.answer("⛔ Доступ запрещён. Обратитесь к администратору.")
+                if isinstance(event, CallbackQuery):
+                    await event.answer("Доступ запрещён", show_alert=True)
+                elif isinstance(event, Message):
+                    await event.answer("Доступ запрещён. Обратитесь к администратору.")
                 return None
 
-            # Пробрасываем роль и конфиг пользователя
             user_cfg = self.settings.users.get(str(uid))
             data["user_config"] = user_cfg
             data["role"] = user_cfg.get("role", "readonly") if user_cfg else "readonly"

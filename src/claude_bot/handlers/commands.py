@@ -4,10 +4,12 @@ from datetime import date
 
 from aiogram import Router
 from aiogram.filters import CommandStart, Command, CommandObject
+from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
 from claude_bot.config import Settings
-from claude_bot.services.claude import MODELS
+from claude_bot.services.claude import MODELS, get_project_dir
+from claude_bot.services.storage import SessionStorage
 from claude_bot.state import AppState
 
 router = Router(name="commands")
@@ -34,6 +36,7 @@ async def cmd_help(message: Message) -> None:
         "• Файл — содержимое будет прочитано\n\n"
 
         "<b>Команды бота:</b>\n"
+        "/menu — проекты и сессии\n"
         "/new — новая сессия (сбросить контекст)\n"
         "/cancel — отменить текущий запрос\n"
         "/model — сменить модель (haiku / sonnet / opus)\n"
@@ -62,15 +65,28 @@ async def cmd_help(message: Message) -> None:
 
 
 @router.message(Command("new"))
-async def cmd_new(message: Message, state: AppState) -> None:
+async def cmd_new(
+    message: Message, state: AppState, storage: SessionStorage | None = None,
+) -> None:
     uid = message.from_user.id
     state.user_sessions.pop(uid, None)
+    if storage:
+        await storage.create_new_session(uid)
     await message.answer("Сессия сброшена. Следующее сообщение начнёт новую.")
 
 
 @router.message(Command("cancel"))
-async def cmd_cancel(message: Message, state: AppState) -> None:
+async def cmd_cancel(
+    message: Message, state: AppState, fsm_state: FSMContext,
+) -> None:
     uid = message.from_user.id
+    # Сбросить FSM-состояние если активно
+    current_state = await fsm_state.get_state()
+    if current_state:
+        await fsm_state.clear()
+        await message.answer("Действие отменено.")
+        return
+
     proc = state.active_processes.pop(uid, None)
     if proc:
         proc.kill()
@@ -109,16 +125,33 @@ async def cmd_voice(message: Message, state: AppState) -> None:
 
 
 @router.message(Command("status"))
-async def cmd_status(message: Message, state: AppState, settings: Settings) -> None:
+async def cmd_status(
+    message: Message,
+    state: AppState,
+    settings: Settings,
+    storage: SessionStorage | None = None,
+) -> None:
     uid = message.from_user.id
     model = state.user_models.get(uid, "sonnet")
-    session = state.user_sessions.get(uid, "нет")
     voice = "вкл" if state.user_voice_mode.get(uid, False) else "выкл"
-    cwd = str(settings.projects_dir)
+    cwd = str(get_project_dir(settings, storage, uid))
+
+    project_name = "—"
+    session_name = "—"
+    if storage:
+        user = storage.get_user(uid)
+        project_name = user.active_project or "—"
+        pd = storage._get_project_data(uid)
+        if pd.active_session:
+            for s in pd.sessions:
+                if s.id == pd.active_session:
+                    session_name = s.name
+                    break
 
     await message.answer(
+        f"Проект: {project_name}\n"
+        f"Сессия: {session_name}\n"
         f"Модель: {model}\n"
-        f"Сессия: {session}\n"
         f"Голос: {voice}\n"
         f"Директория: {cwd}"
     )

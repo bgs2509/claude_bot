@@ -7,6 +7,7 @@ from claude_bot.config import Settings
 from claude_bot.middlewares.auth import check_limit
 from claude_bot.services.claude import run_claude, send_long
 from claude_bot.services.speech import transcribe_voice
+from claude_bot.services.storage import SessionStorage
 from claude_bot.state import AppState
 
 from . import download_file, safe_delete, send_files, send_voice_if_enabled
@@ -15,7 +16,12 @@ router = Router(name="voice")
 
 
 @router.message(F.voice)
-async def handle_voice(message: Message, settings: Settings, state: AppState) -> None:
+async def handle_voice(
+    message: Message,
+    settings: Settings,
+    state: AppState,
+    storage: SessionStorage | None = None,
+) -> None:
     uid = message.from_user.id
     if not check_limit(uid, settings, state):
         await message.answer("Дневной лимит сообщений исчерпан.")
@@ -32,7 +38,7 @@ async def handle_voice(message: Message, settings: Settings, state: AppState) ->
 
     await waiting.edit_text(f"🎤 Распознано: {text}\n\n⏳ Claude думает...")
 
-    response = await run_claude(text, uid, settings, state)
+    response = await run_claude(text, uid, settings, state, storage=storage)
     await send_long(message, response.text, settings.max_message_len)
     if response.files:
         await send_files(message, response.files)

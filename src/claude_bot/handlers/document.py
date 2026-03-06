@@ -9,6 +9,7 @@ from aiogram.types import Message
 from claude_bot.config import Settings
 from claude_bot.middlewares.auth import check_limit
 from claude_bot.services.claude import run_claude, send_long
+from claude_bot.services.storage import SessionStorage
 from claude_bot.state import AppState
 
 from . import safe_delete, send_files
@@ -17,7 +18,12 @@ router = Router(name="document")
 
 
 @router.message(F.document)
-async def handle_document(message: Message, settings: Settings, state: AppState) -> None:
+async def handle_document(
+    message: Message,
+    settings: Settings,
+    state: AppState,
+    storage: SessionStorage | None = None,
+) -> None:
     uid = message.from_user.id
     if not check_limit(uid, settings, state):
         await message.answer("Дневной лимит сообщений исчерпан.")
@@ -55,7 +61,7 @@ async def handle_document(message: Message, settings: Settings, state: AppState)
 
     await waiting.edit_text("⏳ Claude думает...")
 
-    response = await run_claude(prompt, uid, settings, state)
+    response = await run_claude(prompt, uid, settings, state, storage=storage)
     await send_long(message, response.text, settings.max_message_len)
     if response.files:
         await send_files(message, response.files)

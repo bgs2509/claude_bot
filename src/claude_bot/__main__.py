@@ -5,6 +5,7 @@ import logging
 
 from claude_bot.bot import create_bot, create_dispatcher
 from claude_bot.config import Settings
+from claude_bot.services.storage import SessionStorage
 from claude_bot.state import AppState
 
 log = logging.getLogger("claude-bot")
@@ -13,6 +14,10 @@ log = logging.getLogger("claude-bot")
 async def _run() -> None:
     settings = Settings()
     state = AppState()
+    storage = SessionStorage(
+        settings.projects_dir / "sessions.json",
+        settings.projects_dir,
+    )
 
     log.info("Claude Code Telegram Bot запущен")
     log.info("Проекты: %s", settings.projects_dir)
@@ -21,7 +26,7 @@ async def _run() -> None:
     log.info("TTS голос: %s", settings.tts_voice)
 
     bot = create_bot(settings)
-    dp = create_dispatcher(settings, state)
+    dp = create_dispatcher(settings, state, storage)
     await dp.start_polling(bot)
 
 

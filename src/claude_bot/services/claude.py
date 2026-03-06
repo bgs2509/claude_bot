@@ -1,12 +1,16 @@
 """Сервис взаимодействия с Claude Code CLI."""
 
+from __future__ import annotations
+
 import asyncio
 import json
 import logging
 import os
+import re
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from aiogram import types
 from aiogram.types import FSInputFile
@@ -14,6 +18,9 @@ from aiogram.types import FSInputFile
 from claude_bot.config import Settings
 from claude_bot.services.format_telegram import markdown_to_telegram_html
 from claude_bot.state import AppState
+
+if TYPE_CHECKING:
+    from claude_bot.services.storage import SessionStorage
 
 log = logging.getLogger("claude-bot")
 
@@ -38,9 +45,29 @@ class ClaudeResponse:
     files: list[Path] = field(default_factory=list)
 
 
-def get_project_dir(settings: Settings) -> Path:
-    """Рабочая директория для Claude."""
-    return settings.projects_dir
+_TITLE_RE = re.compile(r"\[TITLE:\s*(.+?)\]\s*$", re.IGNORECASE)
+
+
+def _extract_title(text: str) -> tuple[str, str | None]:
+    """Извлечь [TITLE: ...] из конца текста. Возвращает (текст_без_title, title)."""
+    match = _TITLE_RE.search(text)
+    if match:
+        return text[:match.start()].rstrip(), match.group(1).strip()
+    return text, None
+
+
+def get_project_dir(
+    settings: Settings,
+    storage: SessionStorage | None = None,
+    uid: int | None = None,
+) -> Path:
+    """Рабочая директория для Claude. Если есть active_project — поддиректория."""
+    base = settings.projects_dir
+    if storage and uid:
+        user = storage.get_user(uid)
+        if user.active_project:
+            return base / user.active_project
+    return base
 
 
 def _snapshot_media(cwd: Path) -> set[Path]:
@@ -64,10 +91,14 @@ def _collect_output_files(cwd: Path, before: set[Path]) -> list[Path]:
 
 
 async def run_claude(
-    prompt: str, uid: int, settings: Settings, state: AppState
+    prompt: str,
+    uid: int,
+    settings: Settings,
+    state: AppState,
+    storage: SessionStorage | None = None,
 ) -> ClaudeResponse:
     """Запустить Claude Code CLI и получить результат."""
-    cwd = get_project_dir(settings)
+    cwd = get_project_dir(settings, storage, uid)
     cwd.mkdir(parents=True, exist_ok=True)
 
     # Подготовка _output/ и снимок медиа
@@ -89,7 +120,10 @@ async def run_claude(
         "Файлы сохраняй в _output/. "
         "Пользователь общается через Telegram-бот. "
         "Он может просить выполнить bash-команды (cd, ls, mkdir, git и любые другие) — выполняй их. "
-        "При смене директории сообщай текущий путь.",
+        "При смене директории сообщай текущий путь. "
+        "Если тема разговора изменилась или расширилась, добавь в самом конце ответа "
+        "[TITLE: три слова описывающие весь диалог целиком]. "
+        "Если тема прежняя — не добавляй TITLE.",
     ]
 
     # Модель пользователя
@@ -98,7 +132,11 @@ async def run_claude(
     cmd += ["--model", model_id]
 
     # Продолжить сессию если есть
-    session_id = state.user_sessions.get(uid)
+    session_id = None
+    if storage:
+        session_id = storage.get_active_session_id(uid)
+    if not session_id:
+        session_id = state.user_sessions.get(uid)
     if session_id:
         cmd += ["--resume", session_id]
 
@@ -148,6 +186,16 @@ async def run_claude(
             state.user_sessions[uid] = sid
     except json.JSONDecodeError:
         pass
+
+    # Парсинг [TITLE:] и сохранение в storage
+    title: str | None = None
+    result_text, title = _extract_title(result_text)
+    if sid and storage:
+        # Fallback: первые 3 слова промпта
+        session_name = title or " ".join(prompt.split()[:3])
+        await storage.save_session(uid, sid, name=session_name if title else None)
+        if title:
+            await storage.update_session_name(uid, sid, title)
 
     # Собрать файлы
     collected_files = _collect_output_files(cwd, media_before)
