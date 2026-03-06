@@ -115,8 +115,8 @@ def get_whisper_model():
             from faster_whisper import WhisperModel
             _whisper_model = WhisperModel(WHISPER_MODEL, compute_type="int8")
             log.info(f"Whisper модель '{WHISPER_MODEL}' загружена")
-        except ImportError:
-            log.warning("faster-whisper не установлен, STT недоступен")
+        except ImportError as e:
+            log.warning("faster-whisper не загружен, STT недоступен: %s", e)
             return None
     return _whisper_model
 
@@ -148,6 +148,7 @@ async def transcribe_voice(file_path: str) -> str | None:
     """Транскрибировать голосовое сообщение в текст."""
     model = get_whisper_model()
     if model is None:
+        log.warning("STT: модель Whisper недоступна, пропуск транскрибации")
         return None
 
     # Конвертировать ogg → wav через ffmpeg
@@ -158,14 +159,23 @@ async def transcribe_voice(file_path: str) -> str | None:
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
-    await proc.communicate()
+    _, stderr_data = await proc.communicate()
 
     if proc.returncode != 0:
+        log.error("STT: ffmpeg конвертация провалилась (код %d): %s",
+                  proc.returncode, stderr_data.decode().strip())
         return None
 
     # Транскрибация
-    segments, _ = model.transcribe(wav_path, language="ru")
-    text = " ".join(s.text for s in segments).strip()
+    try:
+        segments, _ = model.transcribe(wav_path, language="ru")
+        text = " ".join(s.text for s in segments).strip()
+    except Exception as e:
+        log.error("STT: ошибка транскрибации Whisper: %s", e)
+        return None
+
+    if not text:
+        log.info("STT: Whisper вернул пустой результат (тишина/шум?)")
 
     # Удалить временные файлы
     for p in (file_path, wav_path):
