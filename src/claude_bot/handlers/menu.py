@@ -8,6 +8,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
+from claude_bot.config import Settings, get_user_projects_dir
 from claude_bot.keyboards import build_main_menu, build_paginated_keyboard
 from claude_bot.services.storage import SessionStorage
 
@@ -36,10 +37,11 @@ def _menu_text(storage: SessionStorage, uid: int) -> str:
     return f"Project: {proj}\nSession: {sess}"
 
 
-def _main_menu_markup(storage: SessionStorage, uid: int):
+def _main_menu_markup(storage: SessionStorage, uid: int, settings: Settings):
     """Собрать InlineKeyboardMarkup для главного меню."""
     user = storage.get_user(uid)
-    recent_projects = storage.list_projects(limit=3)
+    projects_dir = get_user_projects_dir(settings, uid)
+    recent_projects = storage.list_projects(projects_dir, limit=3)
     recent_sessions = [
         (s.name, s.id) for s in storage.get_recent_sessions(uid, limit=3)
     ]
@@ -54,20 +56,20 @@ def _main_menu_markup(storage: SessionStorage, uid: int):
 # ── /menu ──
 
 @router.message(Command("menu"))
-async def cmd_menu(message: Message, storage: SessionStorage) -> None:
+async def cmd_menu(message: Message, storage: SessionStorage, settings: Settings) -> None:
     uid = message.from_user.id
     text = _menu_text(storage, uid)
-    markup = _main_menu_markup(storage, uid)
+    markup = _main_menu_markup(storage, uid, settings)
     await message.answer(text, reply_markup=markup)
 
 
 # ── Главное меню (callback) ──
 
 @router.callback_query(F.data == "m:main")
-async def cb_main_menu(callback: CallbackQuery, storage: SessionStorage) -> None:
+async def cb_main_menu(callback: CallbackQuery, storage: SessionStorage, settings: Settings) -> None:
     uid = callback.from_user.id
     text = _menu_text(storage, uid)
-    markup = _main_menu_markup(storage, uid)
+    markup = _main_menu_markup(storage, uid, settings)
     try:
         await callback.message.edit_text(text, reply_markup=markup)
     except Exception:
@@ -78,10 +80,11 @@ async def cb_main_menu(callback: CallbackQuery, storage: SessionStorage) -> None
 # ── Проекты: полный список ──
 
 @router.callback_query(F.data.startswith("p:list:"))
-async def cb_project_list(callback: CallbackQuery, storage: SessionStorage) -> None:
+async def cb_project_list(callback: CallbackQuery, storage: SessionStorage, settings: Settings) -> None:
     uid = callback.from_user.id
     page = int(callback.data.split(":")[2])
-    projects = storage.list_projects()
+    projects_dir = get_user_projects_dir(settings, uid)
+    projects = storage.list_projects(projects_dir)
     active = storage.get_user(uid).active_project
 
     items = []
@@ -106,16 +109,17 @@ async def cb_project_list(callback: CallbackQuery, storage: SessionStorage) -> N
 # ── Проекты: выбор ──
 
 @router.callback_query(F.data.startswith("p:sel:"))
-async def cb_select_project(callback: CallbackQuery, storage: SessionStorage) -> None:
+async def cb_select_project(callback: CallbackQuery, storage: SessionStorage, settings: Settings) -> None:
     uid = callback.from_user.id
     name = callback.data[6:]  # после "p:sel:"
-    ok = await storage.set_active_project(uid, name)
+    projects_dir = get_user_projects_dir(settings, uid)
+    ok = await storage.set_active_project(uid, name, projects_dir)
     if not ok:
         await callback.answer(f"Проект '{name}' не найден", show_alert=True)
         return
 
     text = _menu_text(storage, uid)
-    markup = _main_menu_markup(storage, uid)
+    markup = _main_menu_markup(storage, uid, settings)
     try:
         await callback.message.edit_text(text, reply_markup=markup)
     except Exception:
@@ -138,7 +142,7 @@ async def cb_new_project(
 
 @router.message(CreateProject.waiting_name)
 async def process_project_name(
-    message: Message, state: FSMContext, storage: SessionStorage,
+    message: Message, state: FSMContext, storage: SessionStorage, settings: Settings,
 ) -> None:
     name = message.text.strip() if message.text else ""
     if not re.match(r"^[a-zA-Z0-9_-]{1,32}$", name):
@@ -148,11 +152,12 @@ async def process_project_name(
         return
 
     uid = message.from_user.id
-    await storage.create_project(uid, name)
+    projects_dir = get_user_projects_dir(settings, uid)
+    await storage.create_project(uid, name, projects_dir)
     await state.clear()
 
     text = _menu_text(storage, uid)
-    markup = _main_menu_markup(storage, uid)
+    markup = _main_menu_markup(storage, uid, settings)
     await message.answer(f"Проект '{name}' создан.\n\n{text}", reply_markup=markup)
 
 
@@ -188,7 +193,7 @@ async def cb_session_list(callback: CallbackQuery, storage: SessionStorage) -> N
 # ── Сессии: выбор ──
 
 @router.callback_query(F.data.startswith("s:sel:"))
-async def cb_select_session(callback: CallbackQuery, storage: SessionStorage) -> None:
+async def cb_select_session(callback: CallbackQuery, storage: SessionStorage, settings: Settings) -> None:
     uid = callback.from_user.id
     sid = callback.data[6:]  # после "s:sel:"
     ok = await storage.set_active_session(uid, sid)
@@ -197,7 +202,7 @@ async def cb_select_session(callback: CallbackQuery, storage: SessionStorage) ->
         return
 
     text = _menu_text(storage, uid)
-    markup = _main_menu_markup(storage, uid)
+    markup = _main_menu_markup(storage, uid, settings)
     try:
         await callback.message.edit_text(text, reply_markup=markup)
     except Exception:
@@ -208,12 +213,12 @@ async def cb_select_session(callback: CallbackQuery, storage: SessionStorage) ->
 # ── Сессии: новая ──
 
 @router.callback_query(F.data == "s:new")
-async def cb_new_session(callback: CallbackQuery, storage: SessionStorage) -> None:
+async def cb_new_session(callback: CallbackQuery, storage: SessionStorage, settings: Settings) -> None:
     uid = callback.from_user.id
     await storage.create_new_session(uid)
 
     text = _menu_text(storage, uid)
-    markup = _main_menu_markup(storage, uid)
+    markup = _main_menu_markup(storage, uid, settings)
     try:
         await callback.message.edit_text(text, reply_markup=markup)
     except Exception:

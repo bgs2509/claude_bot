@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 from aiogram import types
 from aiogram.types import FSInputFile
 
-from claude_bot.config import Settings
+from claude_bot.config import Settings, get_user_projects_dir
 from claude_bot.services.format_telegram import markdown_to_telegram_html
 from claude_bot.state import AppState
 
@@ -61,9 +61,11 @@ def get_project_dir(
     storage: SessionStorage | None = None,
     uid: int | None = None,
 ) -> Path:
-    """Рабочая директория для Claude. Если есть active_project — поддиректория."""
-    base = settings.projects_dir
-    if storage and uid:
+    """Рабочая директория для Claude. Per-user projects_dir + active_project."""
+    if uid is None:
+        raise ValueError("uid обязателен для определения рабочей директории")
+    base = get_user_projects_dir(settings, uid)
+    if storage:
         user = storage.get_user(uid)
         if user.active_project:
             return base / user.active_project

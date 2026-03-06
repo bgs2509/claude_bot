@@ -44,9 +44,8 @@ class UserData:
 class SessionStorage:
     """CRUD-хранилище сессий в JSON-файле. Проекты — из ФС."""
 
-    def __init__(self, path: Path, projects_dir: Path) -> None:
+    def __init__(self, path: Path) -> None:
         self._path = path
-        self._projects_dir = projects_dir
         self._lock = asyncio.Lock()
         self._data: dict[int, UserData] = {}
         self._load()
@@ -103,30 +102,30 @@ class SessionStorage:
 
     # ── проекты (из ФС) ──
 
-    def list_projects(self, limit: int | None = None) -> list[str]:
+    def list_projects(self, projects_dir: Path, limit: int | None = None) -> list[str]:
         """Список папок в projects_dir, отсортированных по mtime (новые первые)."""
-        if not self._projects_dir.exists():
+        if not projects_dir.exists():
             return []
         dirs = [
-            d for d in self._projects_dir.iterdir()
+            d for d in projects_dir.iterdir()
             if d.is_dir() and not d.name.startswith((".", "_"))
         ]
         dirs.sort(key=lambda d: d.stat().st_mtime, reverse=True)
         names = [d.name for d in dirs]
         return names[:limit] if limit else names
 
-    async def create_project(self, uid: int, name: str) -> None:
+    async def create_project(self, uid: int, name: str, projects_dir: Path) -> None:
         """mkdir + сделать активным."""
-        (self._projects_dir / name).mkdir(parents=True, exist_ok=True)
+        (projects_dir / name).mkdir(parents=True, exist_ok=True)
         user = self.get_user(uid)
         if name not in user.projects:
             user.projects[name] = ProjectData()
         user.active_project = name
         await self._save()
 
-    async def set_active_project(self, uid: int, name: str) -> bool:
+    async def set_active_project(self, uid: int, name: str, projects_dir: Path) -> bool:
         """Переключить активный проект. Возвращает False если папки нет."""
-        project_path = self._projects_dir / name
+        project_path = projects_dir / name
         if not project_path.is_dir():
             return False
         user = self.get_user(uid)

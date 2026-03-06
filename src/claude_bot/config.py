@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 
@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     """Настройки бота. Читаются из .env и переменных окружения."""
 
     telegram_bot_token: str
-    projects_dir: Path = Path("/home/claude/projects")
+    sessions_file: Path = Path("data/sessions.json")
     whisper_model: str = "base"
     whisper_device: str = "cpu"
     tts_voice: str = "ru-RU-DmitryNeural"
@@ -27,3 +27,21 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             return json.loads(v) if v.strip() else {}
         return v
+
+    @model_validator(mode="after")
+    def validate_users_projects_dir(self) -> "Settings":
+        """Проверить что у каждого юзера указан projects_dir."""
+        for uid_str, cfg in self.users.items():
+            if not cfg.get("projects_dir"):
+                raise ValueError(
+                    f"Пользователь {uid_str}: отсутствует обязательное поле 'projects_dir'"
+                )
+        return self
+
+
+def get_user_projects_dir(settings: Settings, uid: int) -> Path:
+    """Директория проектов конкретного пользователя."""
+    user_cfg = settings.users.get(str(uid))
+    if not user_cfg or not user_cfg.get("projects_dir"):
+        raise ValueError(f"Пользователь {uid} не найден в конфиге или не указан projects_dir")
+    return Path(user_cfg["projects_dir"])

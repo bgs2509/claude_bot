@@ -14,14 +14,12 @@ log = logging.getLogger("claude-bot")
 async def _run() -> None:
     settings = Settings()
     state = AppState()
-    storage = SessionStorage(
-        settings.projects_dir / "sessions.json",
-        settings.projects_dir,
-    )
+    storage = SessionStorage(settings.sessions_file)
 
     log.info("Claude Code Telegram Bot запущен")
-    log.info("Проекты: %s", settings.projects_dir)
     log.info("Пользователей: %s", len(settings.users) or "без ограничений")
+    for uid_str, cfg in settings.users.items():
+        log.info("  %s (%s): %s", cfg.get("name", uid_str), uid_str, cfg["projects_dir"])
     log.info("Whisper модель: %s (device=%s)", settings.whisper_model, settings.whisper_device)
     log.info("TTS голос: %s", settings.tts_voice)
 
