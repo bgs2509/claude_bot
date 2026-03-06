@@ -56,7 +56,7 @@ async def cmd_help(message: Message) -> None:
 
         "<b>Контекст</b> сохраняется между сообщениями. "
         "/new — сбросить.\n\n"
-        "📖 Полная документация: docs/USAGE.md",
+        '📖 <a href="https://github.com/bgs2509/claude_bot/blob/master/docs/USAGE.md">Полная документация</a>',
         parse_mode="HTML",
     )
 
