@@ -1,11 +1,3 @@
-```
-  ___  _                 _         ____        _
- / __|| | __ _  _   _  __| |  ___  | __ )  ___ | |_
-| |   | |/ _` || | | |/ _` | / _ \ |  _ \ / _ \| __|
-| |___| | (_| || |_| | (_| ||  __/ | |_) | (_) | |_
- \____|_|\__,_| \__,_|\__,_| \___| |____/ \___/ \__|
-```
-
 # Claude Code Telegram Bot
 
 **Твой личный AI-ассистент прямо в Telegram — пиши текстом, говори голосом, кидай фотки и документы.**
@@ -33,11 +25,10 @@
 ```bash
 git clone <repo-url> claude_bot
 cd claude_bot
-python -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
 cp .env.example .env
 # Заполни TELEGRAM_BOT_TOKEN и PROJECTS_DIR в .env
-python bot.py
+make install
+make run
 ```
 
 > Для голоса и OCR нужны `ffmpeg` и `tesseract` — см. раздел «Требования» ниже.
@@ -48,7 +39,8 @@ python bot.py
 
 | Компонент | Зачем | Установка (Ubuntu) |
 |-----------|-------|--------------------|
-| **Python 3.11+** | Сам бот | `sudo apt install python3 python3-venv` |
+| **Python 3.11+** | Сам бот | `sudo apt install python3` |
+| **uv** | Пакетный менеджер | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
 | **Node.js 22+** | Claude Code CLI и MCP серверы | `curl -fsSL https://deb.nodesource.com/setup_22.x \| sudo bash -` |
 | **Claude Code CLI** | Мозги бота | `npm install -g @anthropic-ai/claude-code` |
 | **ffmpeg** | Конвертация голосовых OGG → WAV | `sudo apt install ffmpeg` |
@@ -65,10 +57,10 @@ python bot.py
 bash scripts/setup-local.sh
 
 # Или вручную
-python -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
 cp .env.example .env
-# Заполнить .env → запустить: python bot.py
+# Заполнить .env → запустить:
+make install
+make run
 ```
 
 ### На VPS (production)
@@ -151,8 +143,8 @@ sudo systemctl start claude-bot
 
 ```
 ┌──────────────┐     ┌──────────────┐     ┌──────────────────┐
-│   Telegram   │────▶│    bot.py    │────▶│  Claude Code CLI │
-│  (сообщения) │◀────│   (aiogram)  │◀────│   (subprocess)   │
+│   Telegram   │────▶│  claude_bot  │────▶│  Claude Code CLI │
+│  (сообщения) │◀────│  (aiogram)   │◀────│   (subprocess)   │
 └──────────────┘     └──────┬───────┘     └────────┬─────────┘
                             │                      │
                     ┌───────┴───────┐       ┌──────┴──────┐
@@ -173,20 +165,39 @@ sudo systemctl start claude-bot
 
 ```
 claude_bot/
-├── bot.py                  # Основной код бота (все обработчики)
-├── requirements.txt        # Python зависимости
-├── .env.example            # Шаблон переменных окружения
-├── claude-bot.service      # Systemd unit для автозапуска
-├── GUIDE.md                # Полное руководство (1000+ строк)
+├── pyproject.toml             # Зависимости и метаданные
+├── Makefile                   # make run, make install, make clean
+├── .env.example               # Шаблон переменных окружения
+├── claude-bot.service         # Systemd unit для автозапуска
+├── GUIDE.md                   # Полное руководство (1000+ строк)
+├── src/claude_bot/
+│   ├── __init__.py
+│   ├── __main__.py            # Точка входа (uv run claude-bot)
+│   ├── bot.py                 # Фабрики create_bot / create_dispatcher
+│   ├── config.py              # Settings (pydantic-settings)
+│   ├── state.py               # AppState (in-memory состояние)
+│   ├── handlers/
+│   │   ├── __init__.py        # Общие хелперы (download_file, ...)
+│   │   ├── commands.py        # /start, /new, /cancel, /project, ...
+│   │   ├── text.py            # Текстовые сообщения
+│   │   ├── voice.py           # Голосовые сообщения
+│   │   ├── photo.py           # Фотографии
+│   │   └── document.py        # Документы
+│   ├── middlewares/
+│   │   └── auth.py            # Авторизация + check_limit
+│   └── services/
+│       ├── claude.py          # run_claude, send_long
+│       ├── speech.py          # transcribe_voice, synthesize_speech
+│       └── ocr.py             # ocr_image
 ├── configs/
-│   └── claude-settings.json    # Конфигурация MCP серверов
+│   └── claude-settings.json   # Конфигурация MCP серверов
 └── scripts/
-    ├── setup-local.sh      # Установка локально
-    ├── setup-server.sh     # Настройка VPS
-    ├── setup-security.sh   # Безопасность сервера
-    ├── backup.sh           # Автоматический бэкап
-    ├── update.sh           # Обновление компонентов
-    └── healthcheck.sh      # Мониторинг и алерты
+    ├── setup-local.sh         # Установка локально
+    ├── setup-server.sh        # Настройка VPS
+    ├── setup-security.sh      # Безопасность сервера
+    ├── backup.sh              # Автоматический бэкап
+    ├── update.sh              # Обновление компонентов
+    └── healthcheck.sh         # Мониторинг и алерты
 ```
 
 ---
@@ -195,8 +206,8 @@ claude_bot/
 
 | Скрипт | Что делает | Запуск |
 |--------|-----------|--------|
-| `setup-local.sh` | Установка ffmpeg, tesseract, venv, зависимостей | `bash scripts/setup-local.sh` |
-| `setup-server.sh` | Первоначальная настройка VPS: Node.js, Python, swap | `sudo bash scripts/setup-server.sh` |
+| `setup-local.sh` | Установка ffmpeg, tesseract, uv, зависимостей | `bash scripts/setup-local.sh` |
+| `setup-server.sh` | Первоначальная настройка VPS: Node.js, Python, uv, swap | `sudo bash scripts/setup-server.sh` |
 | `setup-security.sh` | SSH hardening, UFW firewall, fail2ban | `sudo bash scripts/setup-security.sh` |
 | `backup.sh` | Бэкап бота, проектов и конфигов | Cron: `0 3 * * *` |
 | `update.sh` | Обновление Claude Code, MCP, Python deps | `bash scripts/update.sh` |

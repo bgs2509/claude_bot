@@ -19,7 +19,7 @@ tar czf "$BACKUP_FILE" \
     --exclude='__pycache__' \
     --exclude='.git' \
     --exclude='node_modules' \
-    --exclude='venv' \
+    --exclude='.venv' \
     /home/claude/claude-bot/ \
     /home/claude/projects/ \
     /home/claude/.claude/settings.json \

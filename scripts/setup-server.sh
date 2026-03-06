@@ -6,11 +6,11 @@ set -euo pipefail
 echo "=== Настройка VPS для Claude Code Bot ==="
 
 # Обновление системы
-echo "[1/7] Обновление системы..."
+echo "[1/8] Обновление системы..."
 apt update && apt upgrade -y
 
 # Создание пользователя
-echo "[2/7] Создание пользователя claude..."
+echo "[2/8] Создание пользователя claude..."
 if id "claude" &>/dev/null; then
     echo "  Пользователь claude уже существует"
 else
@@ -20,7 +20,7 @@ else
 fi
 
 # Node.js 22
-echo "[3/7] Установка Node.js 22..."
+echo "[3/8] Установка Node.js 22..."
 if command -v node &>/dev/null; then
     echo "  Node.js уже установлен: $(node --version)"
 else
@@ -30,15 +30,16 @@ else
 fi
 
 # Python и утилиты
-echo "[4/7] Установка Python и утилит..."
+echo "[4/8] Установка Python и утилит..."
 apt install -y \
     python3 python3-pip python3-venv python3-dev \
     git curl wget unzip htop jq \
     ffmpeg \
-    tesseract-ocr tesseract-ocr-rus tesseract-ocr-eng
+    tesseract-ocr tesseract-ocr-rus tesseract-ocr-eng \
+    make
 
 # Docker
-echo "[5/7] Установка Docker..."
+echo "[5/8] Установка Docker..."
 if command -v docker &>/dev/null; then
     echo "  Docker уже установлен: $(docker --version)"
 else
@@ -48,7 +49,7 @@ else
 fi
 
 # Swap
-echo "[6/7] Настройка swap..."
+echo "[6/8] Настройка swap..."
 if swapon --show | grep -q '/swapfile'; then
     echo "  Swap уже настроен"
 else
@@ -60,8 +61,17 @@ else
     echo "  Swap 2GB создан"
 fi
 
+# uv
+echo "[7/8] Установка uv..."
+if su - claude -c "command -v uv" &>/dev/null; then
+    echo "  uv уже установлен"
+else
+    su - claude -c "curl -LsSf https://astral.sh/uv/install.sh | sh"
+    echo "  uv установлен"
+fi
+
 # Claude Code
-echo "[7/7] Установка Claude Code..."
+echo "[8/8] Установка Claude Code..."
 npm install -g @anthropic-ai/claude-code
 echo "  Claude Code установлен: $(claude --version 2>/dev/null || echo 'проверьте вручную')"
 

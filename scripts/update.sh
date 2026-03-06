@@ -18,9 +18,7 @@ echo "  Кэш очищен (свежие версии загрузятся пр
 # Python зависимости
 echo "[3/4] Обновление Python зависимостей..."
 cd /home/claude/claude-bot
-source venv/bin/activate
-pip install -r requirements.txt --upgrade --quiet
-deactivate
+uv sync --upgrade
 echo "  Зависимости обновлены"
 
 # Перезапуск бота

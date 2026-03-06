@@ -16,39 +16,42 @@ echo "  Node.js:   $(node --version 2>/dev/null || echo 'НЕТ')"
 echo "  Claude:    $(claude --version 2>/dev/null || echo 'НЕТ')"
 echo "  ffmpeg:    $(ffmpeg -version 2>/dev/null | head -1 || echo 'НЕТ')"
 echo "  tesseract: $(tesseract --version 2>/dev/null | head -1 || echo 'НЕТ')"
+echo "  uv:        $(uv --version 2>/dev/null || echo 'НЕТ')"
 echo ""
 
 # ffmpeg (для голосовых)
 if ! command -v ffmpeg &>/dev/null; then
-    echo "[1/4] Установка ffmpeg..."
+    echo "[1/5] Установка ffmpeg..."
     sudo apt install -y ffmpeg
 else
-    echo "[1/4] ffmpeg уже установлен"
+    echo "[1/5] ffmpeg уже установлен"
 fi
 
 # tesseract (для OCR)
 if ! command -v tesseract &>/dev/null; then
-    echo "[2/4] Установка tesseract..."
+    echo "[2/5] Установка tesseract..."
     sudo apt install -y tesseract-ocr tesseract-ocr-rus tesseract-ocr-eng
 else
-    echo "[2/4] tesseract уже установлен"
+    echo "[2/5] tesseract уже установлен"
 fi
 
-# Python venv и зависимости
-echo "[3/4] Настройка Python окружения..."
-cd "$BOT_DIR"
-if [ ! -d "venv" ]; then
-    python3 -m venv venv
-    echo "  venv создан"
+# uv
+if ! command -v uv &>/dev/null; then
+    echo "[3/5] Установка uv..."
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    export PATH="$HOME/.local/bin:$PATH"
 else
-    echo "  venv уже существует"
+    echo "[3/5] uv уже установлен"
 fi
-source venv/bin/activate
-pip install -r requirements.txt --quiet
+
+# Python зависимости через uv
+echo "[4/5] Установка Python зависимостей..."
+cd "$BOT_DIR"
+uv sync
 echo "  Зависимости установлены"
 
 # .env
-echo "[4/4] Проверка .env..."
+echo "[5/5] Проверка .env..."
 if [ ! -f ".env" ]; then
     cp .env.example .env
     echo "  .env создан из .env.example"
@@ -64,6 +67,7 @@ echo "=== Установка завершена ==="
 echo ""
 echo "Запуск бота:"
 echo "  cd $BOT_DIR"
-echo "  source venv/bin/activate"
-echo "  export \$(grep -v '^#' .env | xargs)"
-echo "  python bot.py"
+echo "  make run"
+echo ""
+echo "Или напрямую:"
+echo "  uv run claude-bot"

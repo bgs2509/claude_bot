@@ -297,7 +297,7 @@ cp configs/claude-settings.json ~/.claude/settings.json
 
 ## 6. Код Telegram-бота
 
-Полный код бота находится в файле `bot.py` (в этой же директории).
+Код бота в `src/claude_bot/` — модульная структура с разделением на конфиг, состояние, сервисы, middleware и хендлеры.
 
 ### Основные возможности
 
@@ -320,17 +320,15 @@ cp configs/claude-settings.json ~/.claude/settings.json
 | `/session` | Показать ID сессии |
 | `/project` | Список проектов |
 | `/project <имя>` | Переключиться на проект |
-| `/voice on/off` | Включить/выключить голосовые ответы |
-| `/users` | Управление пользователями (admin) |
+| `/voice` | Включить/выключить голосовые ответы |
 | `/stats` | Статистика использования (admin) |
 
 ### Установка зависимостей
 
 ```bash
 cd /home/claude/claude-bot
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+make install
+# Или: uv sync
 ```
 
 ---
@@ -364,9 +362,7 @@ pip install -r requirements.txt
 ### Установка STT (faster-whisper)
 
 ```bash
-# В venv бота
-pip install faster-whisper
-
+# Включён в зависимости проекта, устанавливается через uv sync
 # Первый запуск скачает модель (~500MB)
 # Модель: base — баланс скорость/качество
 # Модель: small — лучше качество, больше RAM
@@ -375,10 +371,10 @@ pip install faster-whisper
 ### Установка TTS (edge-tts)
 
 ```bash
-pip install edge-tts
+# Включён в зависимости проекта, устанавливается через uv sync
 
 # Проверка
-edge-tts --voice ru-RU-DmitryNeural --text "Привет мир" --write-media test.mp3
+uv run edge-tts --voice ru-RU-DmitryNeural --text "Привет мир" --write-media test.mp3
 ```
 
 ### Доступные русские голоса
@@ -427,8 +423,7 @@ edge-tts --voice ru-RU-DmitryNeural --text "Привет мир" --write-media t
 # Tesseract для извлечения текста с изображений
 sudo apt install -y tesseract-ocr tesseract-ocr-rus tesseract-ocr-eng
 
-# Python-обёртка
-pip install pytesseract Pillow
+# Python-обёртки (pytesseract, Pillow) включены в зависимости проекта
 ```
 
 ### Сценарии использования
@@ -617,8 +612,7 @@ Type=simple
 User=claude
 Group=claude
 WorkingDirectory=/home/claude/claude-bot
-EnvironmentFile=/home/claude/claude-bot/.env
-ExecStart=/home/claude/claude-bot/venv/bin/python bot.py
+ExecStart=/home/claude/.local/bin/uv run --project /home/claude/claude-bot claude-bot
 Restart=always
 RestartSec=10
 StandardOutput=journal
@@ -629,6 +623,7 @@ SyslogIdentifier=claude-bot
 NoNewPrivileges=yes
 ProtectSystem=strict
 ReadWritePaths=/home/claude
+PrivateTmp=yes
 
 [Install]
 WantedBy=multi-user.target
@@ -696,9 +691,7 @@ tar xzf backup-YYYY-MM-DD.tar.gz
 
 # 4. Установить зависимости
 cd claude-bot
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+uv sync
 
 # 5. Запустить
 sudo systemctl enable claude-bot
@@ -761,8 +754,7 @@ cd /home/claude/claude-bot
 git pull
 
 # Обновить зависимости
-source venv/bin/activate
-pip install -r requirements.txt --upgrade
+uv sync --upgrade
 
 sudo systemctl restart claude-bot
 ```
@@ -817,10 +809,10 @@ claude auth login
 ffmpeg -version
 
 # Проверить faster-whisper
-python3 -c "from faster_whisper import WhisperModel; print('OK')"
+uv run python -c "from faster_whisper import WhisperModel; print('OK')"
 
 # Проверить edge-tts
-edge-tts --list-voices | grep ru-RU
+uv run edge-tts --list-voices | grep ru-RU
 ```
 
 ### Не хватает RAM
@@ -836,7 +828,7 @@ sudo mkswap /swapfile
 sudo swapon /swapfile
 
 # Использовать модель whisper поменьше (tiny вместо base)
-# В bot.py: WHISPER_MODEL = "tiny"
+# В .env: WHISPER_MODEL=tiny
 ```
 
 ### MCP сервер не запускается
@@ -927,12 +919,16 @@ sudo ufw status verbose
 | Python 3.12 | ✅ Установлен | |
 | Node.js 20 | ✅ Установлен | |
 | Claude Code | ✅ Установлен и авторизован | |
+| uv | ❌ Не установлен | Пакетный менеджер |
 | ffmpeg | ❌ Не установлен | Нужен для голосовых |
 | tesseract | ❌ Не установлен | Нужен для OCR фото |
 
 ### Шаг 1: Доустановить недостающее
 
 ```bash
+# uv (пакетный менеджер)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
 # ffmpeg (для голосовых сообщений)
 sudo apt install -y ffmpeg
 
@@ -943,18 +939,17 @@ sudo apt install -y tesseract-ocr tesseract-ocr-rus tesseract-ocr-eng
 Или автоматически:
 
 ```bash
-bash /home/bgs/Henry_Bud_GitHub/claude_bot/scripts/setup-local.sh
+bash scripts/setup-local.sh
 ```
 
-> Если голос и фото не нужны — этот шаг можно пропустить. Бот будет работать только с текстом.
+> Если голос и фото не нужны — ffmpeg и tesseract можно пропустить. Бот будет работать только с текстом.
 
-### Шаг 2: Создать виртуальное окружение
+### Шаг 2: Установить зависимости
 
 ```bash
 cd /home/bgs/Henry_Bud_GitHub/claude_bot
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+make install
+# Или: uv sync
 ```
 
 ### Шаг 3: Настроить .env
@@ -973,9 +968,7 @@ nano .env  # или любой редактор
 
 ```bash
 cd /home/bgs/Henry_Bud_GitHub/claude_bot
-source venv/bin/activate
-export $(grep -v '^#' .env | xargs)
-python bot.py
+make run
 ```
 
 Бот запущен. Открой Telegram → найди своего бота → `/start`.
@@ -991,9 +984,7 @@ python bot.py
 ```bash
 # Вариант 1: nohup
 cd /home/bgs/Henry_Bud_GitHub/claude_bot
-source venv/bin/activate
-export $(grep -v '^#' .env | xargs)
-nohup python bot.py > bot.log 2>&1 &
+nohup uv run claude-bot > bot.log 2>&1 &
 echo $! > bot.pid
 
 # Остановить
@@ -1002,9 +993,7 @@ kill $(cat bot.pid)
 # Вариант 2: tmux/screen
 tmux new -s claude-bot
 cd /home/bgs/Henry_Bud_GitHub/claude_bot
-source venv/bin/activate
-export $(grep -v '^#' .env | xargs)
-python bot.py
+make run
 # Ctrl+B, D — отключиться от сессии
 # tmux attach -t claude-bot — вернуться
 ```
@@ -1040,14 +1029,13 @@ npm install -g @anthropic-ai/claude-code
 claude auth login
 
 # 5. Запустить бота
-mkdir ~/claude-bot && cd ~/claude-bot
-python3 -m venv venv && source venv/bin/activate
-pip install aiogram faster-whisper edge-tts pytesseract Pillow
-# Скопировать bot.py и .env
+git clone <repo-url> ~/claude-bot && cd ~/claude-bot
+cp .env.example .env
 # Настроить .env
-python bot.py
+make install
+make run
 ```
 
 ---
 
-*Версия документа: 1.1 | Дата: 2026-03-05*
+*Версия документа: 2.0 | Дата: 2026-03-06*
