@@ -17,6 +17,8 @@ class AppState:
     user_voice_mode: dict[int, bool] = field(default_factory=dict)
     # uid → {"date": "YYYY-MM-DD", "count": N}
     user_daily_count: dict[int, dict] = field(default_factory=dict)
+    # uid → список timestamp последних запросов (для rate-limit)
+    user_request_times: dict[int, list[float]] = field(default_factory=dict)
     # uid → активный процесс Claude
     active_processes: dict[int, asyncio.subprocess.Process] = field(default_factory=dict)
 

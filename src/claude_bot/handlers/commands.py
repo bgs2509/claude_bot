@@ -99,7 +99,11 @@ async def cmd_cancel(
 
 
 @router.message(Command("model"))
-async def cmd_model(message: Message, command: CommandObject, state: AppState) -> None:
+async def cmd_model(message: Message, command: CommandObject, state: AppState, role: str) -> None:
+    if role != "admin":
+        await message.answer("Только для admin.")
+        return
+
     uid = message.from_user.id
     args = command.args
 
@@ -135,7 +139,16 @@ async def cmd_status(
     storage: SessionStorage | None = None,
 ) -> None:
     uid = message.from_user.id
-    model = state.user_models.get(uid, "sonnet")
+    # Определить актуальную модель с учётом конфига
+    user_cfg = settings.users.get(str(uid))
+    user_role = user_cfg.get("role", "readonly") if user_cfg else "readonly"
+    config_model = user_cfg.get("model") if user_cfg else None
+    if user_role == "user" and config_model:
+        model = config_model
+    elif config_model:
+        model = state.user_models.get(uid, config_model)
+    else:
+        model = state.user_models.get(uid, "sonnet")
     voice = "вкл" if state.user_voice_mode.get(uid, False) else "выкл"
     cwd = str(get_project_dir(settings, storage, uid))
 
@@ -171,11 +184,7 @@ async def cmd_usage(message: Message, settings: Settings, state: AppState) -> No
         else 0
     )
 
-    cfg = settings.users.get(str(uid))
-    limit = cfg.get("limit", 0) if cfg else 0
-    limit_str = str(limit) if limit else "∞"
-
-    await message.answer(f"Сегодня: {today_count} / {limit_str} сообщений")
+    await message.answer(f"Сегодня: {today_count} сообщений")
 
 
 @router.message(Command("stats"))

@@ -126,8 +126,20 @@ async def run_claude(
         "Если тема прежняя — не добавляй TITLE.",
     ]
 
-    # Модель пользователя
-    model_name = state.user_models.get(uid, "sonnet")
+    # Модель: из конфига юзера, для user — принудительно из конфига
+    user_cfg = settings.users.get(str(uid))
+    user_role = user_cfg.get("role", "readonly") if user_cfg else "readonly"
+    config_model = user_cfg.get("model") if user_cfg else None
+
+    if user_role == "user" and config_model:
+        # Роль user — всегда модель из конфига, нельзя менять
+        model_name = config_model
+    elif config_model:
+        # Admin — конфиг как дефолт, можно переопределить через /model
+        model_name = state.user_models.get(uid, config_model)
+    else:
+        model_name = state.user_models.get(uid, "sonnet")
+
     model_id = MODELS.get(model_name, MODELS["sonnet"])
     cmd += ["--model", model_id]
 
@@ -141,9 +153,7 @@ async def run_claude(
         cmd += ["--resume", session_id]
 
     # Права: admin и user — полный доступ, readonly — только чтение
-    cfg = settings.users.get(str(uid))
-    role = cfg.get("role", "readonly") if cfg else "readonly"
-    if role in ("admin", "user"):
+    if user_role in ("admin", "user"):
         cmd += ["--dangerously-skip-permissions"]
 
     env = os.environ.copy()

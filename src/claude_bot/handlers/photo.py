@@ -1,10 +1,12 @@
 """Обработка фотографий."""
 
+import asyncio
+
 from aiogram import F, Router
 from aiogram.types import Message
 
 from claude_bot.config import Settings
-from claude_bot.middlewares.auth import check_limit
+from claude_bot.middlewares.auth import check_rate_limit, track_usage
 from claude_bot.services.claude import run_claude, send_long
 from claude_bot.services.ocr import ocr_image
 from claude_bot.services.storage import SessionStorage
@@ -23,9 +25,11 @@ async def handle_photo(
     storage: SessionStorage | None = None,
 ) -> None:
     uid = message.from_user.id
-    if not check_limit(uid, settings, state):
-        await message.answer("Дневной лимит сообщений исчерпан.")
-        return
+    wait = check_rate_limit(uid, settings, state)
+    if wait > 0:
+        await asyncio.sleep(wait)
+        check_rate_limit(uid, settings, state)
+    track_usage(uid, state)
 
     waiting = await message.answer("📷 Обрабатываю фото...")
 

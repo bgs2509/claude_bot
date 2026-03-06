@@ -1,5 +1,6 @@
 """Middleware авторизации: проверка доступа и пробрасывание зависимостей."""
 
+import time
 from collections.abc import Awaitable, Callable
 from datetime import date
 from typing import Any
@@ -66,23 +67,37 @@ class AuthMiddleware(BaseMiddleware):
         return str(uid) in self.settings.users
 
 
-def check_limit(uid: int, settings: Settings, state: AppState) -> bool:
-    """Проверить дневной лимит сообщений. True = можно отправить."""
-    today = date.today().isoformat()
-    data = state.user_daily_count.get(uid, {"date": "", "count": 0})
-
-    if data["date"] != today:
-        data = {"date": today, "count": 0}
-
-    # Всегда инкрементируем счётчик (для /usage и /stats)
-    data["count"] += 1
-    state.user_daily_count[uid] = data
-
+def check_rate_limit(uid: int, settings: Settings, state: AppState) -> float:
+    """Проверить rate-limit для роли user. Возвращает 0 если можно, иначе секунды ожидания."""
     cfg = settings.users.get(str(uid))
     if not cfg:
-        return True
-    limit = cfg.get("limit", 0)
-    if limit == 0:
-        return True  # Безлимит
+        return 0.0
+    if cfg.get("role") != "user":
+        return 0.0  # Rate-limit только для роли user
 
-    return data["count"] <= limit
+    now = time.time()
+    window = 60.0
+    max_requests = 2
+
+    times = state.user_request_times.get(uid, [])
+    # Оставить только запросы в пределах окна
+    times = [t for t in times if now - t < window]
+
+    if len(times) >= max_requests:
+        wait = window - (now - times[0])
+        state.user_request_times[uid] = times
+        return max(wait, 0.1)
+
+    times.append(now)
+    state.user_request_times[uid] = times
+    return 0.0
+
+
+def track_usage(uid: int, state: AppState) -> None:
+    """Инкремент дневного счётчика для статистики (/usage, /stats)."""
+    today = date.today().isoformat()
+    data = state.user_daily_count.get(uid, {"date": "", "count": 0})
+    if data["date"] != today:
+        data = {"date": today, "count": 0}
+    data["count"] += 1
+    state.user_daily_count[uid] = data
