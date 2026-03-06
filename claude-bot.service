@@ -1,0 +1,26 @@
+[Unit]
+Description=Claude Code Telegram Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=claude
+Group=claude
+WorkingDirectory=/home/claude/claude-bot
+EnvironmentFile=/home/claude/claude-bot/.env
+ExecStart=/home/claude/claude-bot/venv/bin/python bot.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=claude-bot
+
+# Безопасность
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/home/claude
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target
