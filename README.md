@@ -12,6 +12,8 @@
 - **🎤 Голос** — говоришь голосом → бот распознаёт (faster-whisper) → отвечает текстом и голосом (edge-tts)
 - **📷 Фото** — кидаешь скриншот или фотку → OCR (tesseract) → Claude анализирует
 - **📄 Документы** — отправляешь файл → бот читает содержимое → Claude обрабатывает
+- **📎 Файлы от Claude** — скриншоты, CSV и другие файлы, созданные Claude, автоматически отправляются в чат
+- **📏 Умные длинные ответы** — вместо спама из 10+ сообщений: первый чанк + `.md` файл с полным ответом
 - **👥 Мультипользователь** — роли admin/user/readonly, дневные лимиты, изоляция проектов
 - **📂 Мульти-проект** — переключайся между проектами прямо в чате (`/project`)
 - **🔌 MCP серверы** — GitHub, Playwright, Brave Search, PostgreSQL, SQLite и ещё 6 штук
@@ -96,6 +98,7 @@ sudo systemctl start claude-bot
 | `USERS` | — | JSON с пользователями и ролями | `{}` (доступ всем) |
 | `WHISPER_MODEL` | — | Модель STT: `tiny`, `base`, `small` | `base` |
 | `TTS_VOICE` | — | Голос TTS | `ru-RU-DmitryNeural` |
+| `MAX_MESSAGE_LEN` | — | Макс. длина сообщения (дальше — `.md` файл) | `4000` |
 | `CLAUDE_TIMEOUT` | — | Таймаут ответа Claude (сек) | `600` |
 
 ### Настройка пользователей
@@ -177,7 +180,7 @@ claude_bot/
 │   ├── config.py              # Settings (pydantic-settings)
 │   ├── state.py               # AppState (in-memory состояние)
 │   ├── handlers/
-│   │   ├── __init__.py        # Общие хелперы (download_file, ...)
+│   │   ├── __init__.py        # Общие хелперы (download_file, send_files, ...)
 │   │   ├── commands.py        # /start, /new, /cancel, /project, ...
 │   │   ├── text.py            # Текстовые сообщения
 │   │   ├── voice.py           # Голосовые сообщения
@@ -186,7 +189,8 @@ claude_bot/
 │   ├── middlewares/
 │   │   └── auth.py            # Авторизация + check_limit
 │   └── services/
-│       ├── claude.py          # run_claude, send_long
+│       ├── claude.py          # ClaudeResponse, run_claude, send_long
+│       ├── format_telegram.py # Markdown → Telegram HTML
 │       ├── speech.py          # transcribe_voice, synthesize_speech
 │       └── ocr.py             # ocr_image
 ├── configs/
