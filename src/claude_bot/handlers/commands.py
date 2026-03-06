@@ -19,8 +19,11 @@ router = Router(name="commands")
 async def cmd_start(message: Message) -> None:
     await message.answer(
         "Claude Code Bot\n\n"
-        "Отправь текст, голосовое или фото — Claude ответит.\n\n"
-        "/help — справка и список команд"
+        "Что умею:\n"
+        "• Текст, голос, фото, файлы → Claude ответит\n"
+        "• Работаю с кодом, файловой системой, bash\n"
+        "• Проекты и сессии — /menu\n\n"
+        "/help — полная справка и все команды"
     )
 
 

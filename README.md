@@ -32,6 +32,7 @@ Telegram-обёртка над Claude Code CLI — превращает Смар
 - **Голос** — распознавание речи (faster-whisper) → Claude → озвучка ответа (edge-tts)
 - **Фото** — OCR (tesseract) → Claude анализирует
 - **Документы** — чтение файлов и обработка содержимого
+- **Проекты и сессии** — управление контекстом через inline-меню (`/menu`): именованные проекты и сессии
 - **MCP серверы** — GitHub, Playwright, Brave Search, PostgreSQL и другие
 - **Мультипользователь** — роли admin/user/readonly, дневные лимиты
 
@@ -68,6 +69,7 @@ make run
 | Команда | Описание |
 |---------|----------|
 | `/help` | Справка и список команд |
+| `/menu` | Проекты и сессии (главное меню с кнопками) |
 | `/new` | Новая сессия (сброс контекста) |
 | `/cancel` | Отменить текущий запрос |
 | `/model` | Сменить модель (haiku / sonnet / opus) |
@@ -93,8 +95,10 @@ claude_bot/
 │   ├── bot.py                 # Фабрики create_bot / create_dispatcher
 │   ├── config.py              # Settings (pydantic-settings)
 │   ├── state.py               # AppState (in-memory состояние)
+│   ├── keyboards.py           # Inline-клавиатуры (главное меню, пагинация)
 │   ├── handlers/
 │   │   ├── commands.py        # Команды бота
+│   │   ├── menu.py            # /menu, проекты, сессии (inline callback)
 │   │   ├── text.py            # Текстовые сообщения
 │   │   ├── voice.py           # Голосовые сообщения
 │   │   ├── photo.py           # Фотографии
@@ -105,9 +109,8 @@ claude_bot/
 │       ├── claude.py          # ClaudeResponse, run_claude, send_long
 │       ├── format_telegram.py # Markdown → Telegram HTML
 │       ├── speech.py          # transcribe_voice, synthesize_speech
-│       └── ocr.py             # ocr_image
-├── configs/
-│   └── claude-settings.json   # Конфигурация MCP серверов
+│       ├── ocr.py             # ocr_image
+│       └── storage.py         # SessionStorage (проекты, сессии, пользователи)
 ├── docs/
 │   ├── USAGE.md               # Руководство пользователя
 │   └── DEPLOYMENT.md          # Развёртывание и администрирование
