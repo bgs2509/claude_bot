@@ -43,7 +43,10 @@ def main() -> None:
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s [%(request_id)s uid:%(user_id)s]: %(message)s",
     )
-    logging.getLogger().addFilter(_ContextFilter())
+    # Фильтр на handler, чтобы record получал request_id/user_id ДО форматирования
+    ctx_filter = _ContextFilter()
+    for handler in logging.getLogger().handlers:
+        handler.addFilter(ctx_filter)
     asyncio.run(_run())
 
 
