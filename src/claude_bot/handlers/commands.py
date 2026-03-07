@@ -69,10 +69,10 @@ async def cmd_help(message: Message) -> None:
 
 @router.message(Command("new"))
 async def cmd_new(
-    message: Message, state: AppState, storage: SessionStorage | None = None,
+    message: Message, app_state: AppState, storage: SessionStorage | None = None,
 ) -> None:
     uid = message.from_user.id
-    state.user_sessions.pop(uid, None)
+    app_state.user_sessions.pop(uid, None)
     if storage:
         await storage.create_new_session(uid)
     await message.answer("Сессия сброшена. Следующее сообщение начнёт новую.")
@@ -80,17 +80,17 @@ async def cmd_new(
 
 @router.message(Command("cancel"))
 async def cmd_cancel(
-    message: Message, state: AppState, fsm_state: FSMContext,
+    message: Message, app_state: AppState, state: FSMContext,
 ) -> None:
     uid = message.from_user.id
     # Сбросить FSM-состояние если активно
-    current_state = await fsm_state.get_state()
+    current_state = await state.get_state()
     if current_state:
-        await fsm_state.clear()
+        await state.clear()
         await message.answer("Действие отменено.")
         return
 
-    proc = state.active_processes.pop(uid, None)
+    proc = app_state.active_processes.pop(uid, None)
     if proc:
         proc.kill()
         await message.answer("Запрос отменён.")
@@ -99,7 +99,7 @@ async def cmd_cancel(
 
 
 @router.message(Command("model"))
-async def cmd_model(message: Message, command: CommandObject, state: AppState, role: str) -> None:
+async def cmd_model(message: Message, command: CommandObject, app_state: AppState, role: str) -> None:
     if role != "admin":
         await message.answer("Только для admin.")
         return
@@ -108,7 +108,7 @@ async def cmd_model(message: Message, command: CommandObject, state: AppState, r
     args = command.args
 
     if not args:
-        current = state.user_models.get(uid, "sonnet")
+        current = app_state.user_models.get(uid, "sonnet")
         names = " | ".join(MODELS.keys())
         await message.answer(f"Модель: {current}\nДоступные: {names}")
         return
@@ -118,15 +118,15 @@ async def cmd_model(message: Message, command: CommandObject, state: AppState, r
         await message.answer(f"Неизвестная модель. Доступные: {' | '.join(MODELS.keys())}")
         return
 
-    state.user_models[uid] = name
+    app_state.user_models[uid] = name
     await message.answer(f"Модель: {name}")
 
 
 @router.message(Command("voice"))
-async def cmd_voice(message: Message, state: AppState) -> None:
+async def cmd_voice(message: Message, app_state: AppState) -> None:
     uid = message.from_user.id
-    current = state.user_voice_mode.get(uid, False)
-    state.user_voice_mode[uid] = not current
+    current = app_state.user_voice_mode.get(uid, False)
+    app_state.user_voice_mode[uid] = not current
     status = "включён" if not current else "выключен"
     await message.answer(f"Голосовой режим {status}")
 
@@ -134,7 +134,7 @@ async def cmd_voice(message: Message, state: AppState) -> None:
 @router.message(Command("status"))
 async def cmd_status(
     message: Message,
-    state: AppState,
+    app_state: AppState,
     settings: Settings,
     storage: SessionStorage | None = None,
 ) -> None:
@@ -146,10 +146,10 @@ async def cmd_status(
     if user_role == "user" and config_model:
         model = config_model
     elif config_model:
-        model = state.user_models.get(uid, config_model)
+        model = app_state.user_models.get(uid, config_model)
     else:
-        model = state.user_models.get(uid, "sonnet")
-    voice = "вкл" if state.user_voice_mode.get(uid, False) else "выкл"
+        model = app_state.user_models.get(uid, "sonnet")
+    voice = "вкл" if app_state.user_voice_mode.get(uid, False) else "выкл"
     cwd = str(get_project_dir(settings, storage, uid))
 
     project_name = "—"
@@ -174,9 +174,9 @@ async def cmd_status(
 
 
 @router.message(Command("usage"))
-async def cmd_usage(message: Message, settings: Settings, state: AppState) -> None:
+async def cmd_usage(message: Message, settings: Settings, app_state: AppState) -> None:
     uid = message.from_user.id
-    count_data = state.user_daily_count.get(uid, {})
+    count_data = app_state.user_daily_count.get(uid, {})
     today = date.today().isoformat()
     today_count = (
         count_data.get("count", 0)
@@ -188,7 +188,7 @@ async def cmd_usage(message: Message, settings: Settings, state: AppState) -> No
 
 
 @router.message(Command("stats"))
-async def cmd_stats(message: Message, settings: Settings, state: AppState, role: str) -> None:
+async def cmd_stats(message: Message, settings: Settings, app_state: AppState, role: str) -> None:
     if role != "admin":
         await message.answer("Только для admin.")
         return
@@ -197,7 +197,7 @@ async def cmd_stats(message: Message, settings: Settings, state: AppState, role:
     for user_id_str, cfg in settings.users.items():
         name = cfg.get("name", user_id_str)
         user_role = cfg.get("role", "?")
-        count_data = state.user_daily_count.get(int(user_id_str), {})
+        count_data = app_state.user_daily_count.get(int(user_id_str), {})
         today_count = (
             count_data.get("count", 0)
             if count_data.get("date") == date.today().isoformat()

@@ -22,15 +22,15 @@ router = Router(name="document")
 async def handle_document(
     message: Message,
     settings: Settings,
-    state: AppState,
+    app_state: AppState,
     storage: SessionStorage | None = None,
 ) -> None:
     uid = message.from_user.id
-    wait = check_rate_limit(uid, settings, state)
+    wait = check_rate_limit(uid, settings, app_state)
     if wait > 0:
         await asyncio.sleep(wait)
-        check_rate_limit(uid, settings, state)
-    track_usage(uid, state)
+        check_rate_limit(uid, settings, app_state)
+    track_usage(uid, app_state)
 
     doc = message.document
     if doc.file_size > 1_000_000:
@@ -64,7 +64,7 @@ async def handle_document(
 
     await waiting.edit_text("⏳ Claude думает...")
 
-    response = await run_claude(prompt, uid, settings, state, storage=storage)
+    response = await run_claude(prompt, uid, settings, app_state, storage=storage)
     await send_long(message, response.text, settings.max_message_len)
     if response.files:
         await send_files(message, response.files)

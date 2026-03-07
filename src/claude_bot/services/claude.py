@@ -96,7 +96,7 @@ async def run_claude(
     prompt: str,
     uid: int,
     settings: Settings,
-    state: AppState,
+    app_state: AppState,
     storage: SessionStorage | None = None,
 ) -> ClaudeResponse:
     """Запустить Claude Code CLI и получить результат."""
@@ -138,9 +138,9 @@ async def run_claude(
         model_name = config_model
     elif config_model:
         # Admin — конфиг как дефолт, можно переопределить через /model
-        model_name = state.user_models.get(uid, config_model)
+        model_name = app_state.user_models.get(uid, config_model)
     else:
-        model_name = state.user_models.get(uid, "sonnet")
+        model_name = app_state.user_models.get(uid, "sonnet")
 
     model_id = MODELS.get(model_name, MODELS["sonnet"])
     cmd += ["--model", model_id]
@@ -150,7 +150,7 @@ async def run_claude(
     if storage:
         session_id = storage.get_active_session_id(uid)
     if not session_id:
-        session_id = state.user_sessions.get(uid)
+        session_id = app_state.user_sessions.get(uid)
     if session_id:
         cmd += ["--resume", session_id]
 
@@ -167,7 +167,7 @@ async def run_claude(
         cwd=str(cwd),
         env=env,
     )
-    state.active_processes[uid] = proc
+    app_state.active_processes[uid] = proc
 
     try:
         stdout, stderr = await asyncio.wait_for(
@@ -179,7 +179,7 @@ async def run_claude(
             text=f"⏰ Таймаут ({settings.claude_timeout // 60} мин). Используй /cancel для прерывания."
         )
     finally:
-        state.active_processes.pop(uid, None)
+        app_state.active_processes.pop(uid, None)
 
     raw = stdout.decode().strip()
     if not raw:
@@ -195,7 +195,7 @@ async def run_claude(
         result_text = data.get("result", raw)
         sid = data.get("session_id")
         if sid:
-            state.user_sessions[uid] = sid
+            app_state.user_sessions[uid] = sid
     except json.JSONDecodeError:
         pass
 

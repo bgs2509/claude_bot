@@ -20,16 +20,16 @@ router = Router(name="text")
 async def handle_text(
     message: Message,
     settings: Settings,
-    state: AppState,
+    app_state: AppState,
     storage: SessionStorage | None = None,
 ) -> None:
     uid = message.from_user.id
-    wait = check_rate_limit(uid, settings, state)
+    wait = check_rate_limit(uid, settings, app_state)
     if wait > 0:
         await asyncio.sleep(wait)
         # После ожидания — зарегистрировать запрос
-        check_rate_limit(uid, settings, state)
-    track_usage(uid, state)
+        check_rate_limit(uid, settings, app_state)
+    track_usage(uid, app_state)
 
     prompt = message.text
     if not prompt:
@@ -37,10 +37,10 @@ async def handle_text(
 
     waiting = await message.answer("⏳ Claude думает...")
 
-    response = await run_claude(prompt, uid, settings, state, storage=storage)
+    response = await run_claude(prompt, uid, settings, app_state, storage=storage)
     await send_long(message, response.text, settings.max_message_len)
     if response.files:
         await send_files(message, response.files)
 
-    await send_voice_if_enabled(message, response.text, uid, settings, state)
+    await send_voice_if_enabled(message, response.text, uid, settings, app_state)
     await safe_delete(waiting)

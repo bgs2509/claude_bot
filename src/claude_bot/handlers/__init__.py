@@ -27,10 +27,10 @@ async def send_voice_if_enabled(
     text: str,
     uid: int,
     settings: Settings,
-    state: AppState,
+    app_state: AppState,
 ) -> None:
     """Отправить голосовой ответ если у пользователя включён голосовой режим."""
-    if not state.user_voice_mode.get(uid, False):
+    if not app_state.user_voice_mode.get(uid, False):
         return
     mp3_path = await synthesize_speech(text, settings)
     if mp3_path:

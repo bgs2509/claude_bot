@@ -21,22 +21,22 @@ router = Router(name="photo")
 async def handle_photo(
     message: Message,
     settings: Settings,
-    state: AppState,
+    app_state: AppState,
     storage: SessionStorage | None = None,
 ) -> None:
     uid = message.from_user.id
-    wait = check_rate_limit(uid, settings, state)
+    wait = check_rate_limit(uid, settings, app_state)
     if wait > 0:
         await asyncio.sleep(wait)
-        check_rate_limit(uid, settings, state)
-    track_usage(uid, state)
+        check_rate_limit(uid, settings, app_state)
+    track_usage(uid, app_state)
 
     waiting = await message.answer("📷 Обрабатываю фото...")
 
     # Скачать фото (берём наибольшее разрешение)
     img_path = await download_file(message.bot, message.photo[-1].file_id, ".jpg")
 
-    ocr_text = await ocr_image(img_path, state)
+    ocr_text = await ocr_image(img_path, app_state)
 
     caption = message.caption or "Проанализируй это изображение"
     prompt = (
@@ -47,7 +47,7 @@ async def handle_photo(
 
     await waiting.edit_text("⏳ Claude думает...")
 
-    response = await run_claude(prompt, uid, settings, state, storage=storage)
+    response = await run_claude(prompt, uid, settings, app_state, storage=storage)
     await send_long(message, response.text, settings.max_message_len)
     if response.files:
         await send_files(message, response.files)

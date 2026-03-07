@@ -21,31 +21,31 @@ router = Router(name="voice")
 async def handle_voice(
     message: Message,
     settings: Settings,
-    state: AppState,
+    app_state: AppState,
     storage: SessionStorage | None = None,
 ) -> None:
     uid = message.from_user.id
-    wait = check_rate_limit(uid, settings, state)
+    wait = check_rate_limit(uid, settings, app_state)
     if wait > 0:
         await asyncio.sleep(wait)
-        check_rate_limit(uid, settings, state)
-    track_usage(uid, state)
+        check_rate_limit(uid, settings, app_state)
+    track_usage(uid, app_state)
 
     waiting = await message.answer("🎤 Транскрибирую...")
 
     ogg_path = await download_file(message.bot, message.voice.file_id, ".ogg")
 
-    text = await transcribe_voice(ogg_path, settings, state)
+    text = await transcribe_voice(ogg_path, settings, app_state)
     if not text:
         await waiting.edit_text("Не удалось распознать голос. Отправь текстом.")
         return
 
     await waiting.edit_text(f"🎤 Распознано: {text}\n\n⏳ Claude думает...")
 
-    response = await run_claude(text, uid, settings, state, storage=storage)
+    response = await run_claude(text, uid, settings, app_state, storage=storage)
     await send_long(message, response.text, settings.max_message_len)
     if response.files:
         await send_files(message, response.files)
 
-    await send_voice_if_enabled(message, response.text, uid, settings, state)
+    await send_voice_if_enabled(message, response.text, uid, settings, app_state)
     await safe_delete(waiting)

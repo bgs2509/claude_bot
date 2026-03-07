@@ -35,7 +35,7 @@ class AuthMiddleware(BaseMiddleware):
         data: dict[str, Any],
     ) -> Any:
         data["settings"] = self.settings
-        data["state"] = self.state
+        data["app_state"] = self.state
         data["storage"] = self.storage
 
         # Получить from_user из Message или CallbackQuery

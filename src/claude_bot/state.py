@@ -7,7 +7,7 @@ from typing import Any
 
 @dataclass
 class AppState:
-    """Общее состояние приложения. Передаётся через data["state"] в хендлерах."""
+    """Общее состояние приложения. Передаётся через data["app_state"] в хендлерах."""
 
     # uid → session_id
     user_sessions: dict[int, str] = field(default_factory=dict)
