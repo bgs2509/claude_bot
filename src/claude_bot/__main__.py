@@ -5,10 +5,20 @@ import logging
 
 from claude_bot.bot import create_bot, create_dispatcher
 from claude_bot.config import Settings
+from claude_bot.context import request_id_var, user_id_var
 from claude_bot.services.storage import SessionStorage
 from claude_bot.state import AppState
 
 log = logging.getLogger("claude-bot")
+
+
+class _ContextFilter(logging.Filter):
+    """Добавляет request_id и user_id ко всем log records."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        record.request_id = request_id_var.get("---")  # type: ignore[attr-defined]
+        record.user_id = user_id_var.get("---")  # type: ignore[attr-defined]
+        return True
 
 
 async def _run() -> None:
@@ -31,8 +41,9 @@ async def _run() -> None:
 def main() -> None:
     logging.basicConfig(
         level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        format="%(asctime)s [%(levelname)s] %(name)s [%(request_id)s uid:%(user_id)s]: %(message)s",
     )
+    logging.getLogger().addFilter(_ContextFilter())
     asyncio.run(_run())
 
 

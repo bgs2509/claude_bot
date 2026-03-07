@@ -1,6 +1,8 @@
 """Middleware авторизации: проверка доступа и пробрасывание зависимостей."""
 
+import logging
 import time
+import uuid
 from collections.abc import Awaitable, Callable
 from datetime import date
 from typing import Any
@@ -9,10 +11,13 @@ from aiogram import BaseMiddleware
 from aiogram.types import CallbackQuery, Message, TelegramObject
 
 from claude_bot.config import Settings
+from claude_bot.context import request_id_var, user_id_var
 from claude_bot.state import AppState
 
 if __name__ != "__never__":
     from claude_bot.services.storage import SessionStorage
+
+log = logging.getLogger("claude-bot.auth")
 
 
 class AuthMiddleware(BaseMiddleware):
@@ -34,6 +39,9 @@ class AuthMiddleware(BaseMiddleware):
         event: TelegramObject,
         data: dict[str, Any],
     ) -> Any:
+        # Установить контекст запроса — все log.info() ниже автоматически получат его
+        request_id_var.set(uuid.uuid4().hex[:8])
+
         data["settings"] = self.settings
         data["app_state"] = self.state
         data["storage"] = self.storage
@@ -47,13 +55,17 @@ class AuthMiddleware(BaseMiddleware):
 
         if user:
             uid = user.id
+            user_id_var.set(str(uid))
+
             if not self._is_allowed(uid):
+                log.warning("Доступ запрещён: @%s", user.username)
                 if isinstance(event, CallbackQuery):
                     await event.answer("Доступ запрещён", show_alert=True)
                 elif isinstance(event, Message):
                     await event.answer("Доступ запрещён. Обратитесь к администратору.")
                 return None
 
+            log.info("Запрос от @%s", user.username)
             user_cfg = self.settings.users.get(str(uid))
             data["user_config"] = user_cfg
             data["role"] = user_cfg.get("role", "readonly") if user_cfg else "readonly"

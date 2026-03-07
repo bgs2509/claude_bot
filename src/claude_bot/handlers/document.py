@@ -1,6 +1,7 @@
 """Обработка документов (текстовые файлы)."""
 
 import asyncio
+import logging
 import os
 import tempfile
 
@@ -8,14 +9,15 @@ from aiogram import F, Router
 from aiogram.types import Message
 
 from claude_bot.config import Settings
+from claude_bot.errors import get_user_message
 from claude_bot.middlewares.auth import check_rate_limit, track_usage
-from claude_bot.services.claude import run_claude, send_long
 from claude_bot.services.storage import SessionStorage
 from claude_bot.state import AppState
 
-from . import safe_delete, send_files
+from . import call_claude_safe
 
 router = Router(name="document")
+log = logging.getLogger("claude-bot.document")
 
 
 @router.message(F.document)
@@ -34,9 +36,10 @@ async def handle_document(
 
     doc = message.document
     if doc.file_size > 1_000_000:
-        await message.answer("Файл слишком большой (макс 1MB).")
+        await message.answer(get_user_message("file_too_large"))
         return
 
+    log.info("Документ: %s (%d bytes)", doc.file_name, doc.file_size)
     waiting = await message.answer("📄 Читаю файл...")
 
     file = await message.bot.get_file(doc.file_id)
@@ -46,8 +49,9 @@ async def handle_document(
     try:
         with open(tmp_path, "r", encoding="utf-8", errors="replace") as f:
             content = f.read().replace("\x00", "")
-    except Exception as e:
-        await waiting.edit_text(f"Не удалось прочитать файл: {e}")
+    except Exception:
+        log.error("Ошибка чтения файла %s", doc.file_name, exc_info=True)
+        await waiting.edit_text(get_user_message("file_read_error"))
         return
     finally:
         try:
@@ -64,9 +68,6 @@ async def handle_document(
 
     await waiting.edit_text("⏳ Claude думает...")
 
-    response = await run_claude(prompt, uid, settings, app_state, storage=storage)
-    await send_long(message, response.text, settings.max_message_len)
-    if response.files:
-        await send_files(message, response.files)
-
-    await safe_delete(waiting)
+    await call_claude_safe(
+        message, waiting, prompt, uid, settings, app_state, storage,
+    )

@@ -1,20 +1,21 @@
 """Обработка фотографий."""
 
 import asyncio
+import logging
 
 from aiogram import F, Router
 from aiogram.types import Message
 
 from claude_bot.config import Settings
 from claude_bot.middlewares.auth import check_rate_limit, track_usage
-from claude_bot.services.claude import run_claude, send_long
 from claude_bot.services.ocr import ocr_image
 from claude_bot.services.storage import SessionStorage
 from claude_bot.state import AppState
 
-from . import download_file, safe_delete, send_files
+from . import call_claude_safe, download_file
 
 router = Router(name="photo")
+log = logging.getLogger("claude-bot.photo")
 
 
 @router.message(F.photo)
@@ -31,6 +32,7 @@ async def handle_photo(
         check_rate_limit(uid, settings, app_state)
     track_usage(uid, app_state)
 
+    log.info("Фото")
     waiting = await message.answer("📷 Обрабатываю фото...")
 
     # Скачать фото (берём наибольшее разрешение)
@@ -47,9 +49,6 @@ async def handle_photo(
 
     await waiting.edit_text("⏳ Claude думает...")
 
-    response = await run_claude(prompt, uid, settings, app_state, storage=storage)
-    await send_long(message, response.text, settings.max_message_len)
-    if response.files:
-        await send_files(message, response.files)
-
-    await safe_delete(waiting)
+    await call_claude_safe(
+        message, waiting, prompt, uid, settings, app_state, storage,
+    )

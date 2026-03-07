@@ -1,5 +1,6 @@
 """Обработчики главного меню: навигация по проектам и сессиям."""
 
+import logging
 import re
 
 from aiogram import F, Router
@@ -13,6 +14,7 @@ from claude_bot.keyboards import build_main_menu, build_paginated_keyboard
 from claude_bot.services.storage import SessionStorage
 
 router = Router(name="menu")
+log = logging.getLogger("claude-bot.menu")
 
 
 # ── FSM для создания проекта ──
@@ -72,8 +74,8 @@ async def cb_main_menu(callback: CallbackQuery, storage: SessionStorage, setting
     markup = _main_menu_markup(storage, uid, settings)
     try:
         await callback.message.edit_text(text, reply_markup=markup)
-    except Exception:
-        pass
+    except Exception as exc:
+        log.debug("edit_text: %s", exc)
     await callback.answer()
 
 
@@ -101,8 +103,8 @@ async def cb_project_list(callback: CallbackQuery, storage: SessionStorage, sett
     )
     try:
         await callback.message.edit_text("Projects:", reply_markup=markup)
-    except Exception:
-        pass
+    except Exception as exc:
+        log.debug("edit_text: %s", exc)
     await callback.answer()
 
 
@@ -122,8 +124,8 @@ async def cb_select_project(callback: CallbackQuery, storage: SessionStorage, se
     markup = _main_menu_markup(storage, uid, settings)
     try:
         await callback.message.edit_text(text, reply_markup=markup)
-    except Exception:
-        pass
+    except Exception as exc:
+        log.debug("edit_text: %s", exc)
     await callback.answer(f"Проект: {name}")
 
 
@@ -185,8 +187,8 @@ async def cb_session_list(callback: CallbackQuery, storage: SessionStorage) -> N
     )
     try:
         await callback.message.edit_text(text, reply_markup=markup)
-    except Exception:
-        pass
+    except Exception as exc:
+        log.debug("edit_text: %s", exc)
     await callback.answer()
 
 
@@ -205,8 +207,8 @@ async def cb_select_session(callback: CallbackQuery, storage: SessionStorage, se
     markup = _main_menu_markup(storage, uid, settings)
     try:
         await callback.message.edit_text(text, reply_markup=markup)
-    except Exception:
-        pass
+    except Exception as exc:
+        log.debug("edit_text: %s", exc)
     await callback.answer("Сессия переключена")
 
 
@@ -221,8 +223,8 @@ async def cb_new_session(callback: CallbackQuery, storage: SessionStorage, setti
     markup = _main_menu_markup(storage, uid, settings)
     try:
         await callback.message.edit_text(text, reply_markup=markup)
-    except Exception:
-        pass
+    except Exception as exc:
+        log.debug("edit_text: %s", exc)
     await callback.answer("Новая сессия создана")
 
 

@@ -16,6 +16,7 @@ from aiogram import types
 from aiogram.types import FSInputFile
 
 from claude_bot.config import Settings, get_user_projects_dir
+from claude_bot.errors import get_user_message
 from claude_bot.services.format_telegram import markdown_to_telegram_html
 from claude_bot.state import AppState
 
@@ -98,6 +99,8 @@ async def run_claude(
     settings: Settings,
     app_state: AppState,
     storage: SessionStorage | None = None,
+    *,
+    _retry: bool = False,
 ) -> ClaudeResponse:
     """Запустить Claude Code CLI и получить результат."""
     cwd = get_project_dir(settings, storage, uid)
@@ -145,6 +148,8 @@ async def run_claude(
     model_id = MODELS.get(model_name, MODELS["sonnet"])
     cmd += ["--model", model_id]
 
+    log.info("Claude CLI: model=%s, cwd=%s", model_name, cwd)
+
     # Продолжить сессию если есть
     session_id = None
     if storage:
@@ -175,15 +180,24 @@ async def run_claude(
         )
     except asyncio.TimeoutError:
         proc.kill()
-        return ClaudeResponse(
-            text=f"⏰ Таймаут ({settings.claude_timeout // 60} мин). Используй /cancel для прерывания."
-        )
+        return ClaudeResponse(text=get_user_message("claude_timeout"))
     finally:
         app_state.active_processes.pop(uid, None)
 
     raw = stdout.decode().strip()
+    log.info("Claude CLI: exit=%d, stdout=%d bytes", proc.returncode or 0, len(raw))
+
     if not raw:
         err = stderr.decode().strip()
+        # Auto-retry при невалидной сессии
+        if not _retry and session_id and "No conversation found" in err:
+            log.warning("Сессия %s невалидна, retry без --resume", session_id)
+            app_state.user_sessions.pop(uid, None)
+            if storage:
+                await storage.create_new_session(uid)
+            return await run_claude(
+                prompt, uid, settings, app_state, storage=storage, _retry=True,
+            )
         text = err if err else "(пустой ответ)"
         return ClaudeResponse(text=text)
 

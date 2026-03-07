@@ -1,19 +1,20 @@
 """Обработка текстовых сообщений."""
 
 import asyncio
+import logging
 
 from aiogram import F, Router
 from aiogram.types import Message
 
 from claude_bot.config import Settings
 from claude_bot.middlewares.auth import check_rate_limit, track_usage
-from claude_bot.services.claude import run_claude, send_long
 from claude_bot.services.storage import SessionStorage
 from claude_bot.state import AppState
 
-from . import safe_delete, send_files, send_voice_if_enabled
+from . import call_claude_safe, send_voice_if_enabled
 
 router = Router(name="text")
+log = logging.getLogger("claude-bot.text")
 
 
 @router.message(F.text)
@@ -35,12 +36,11 @@ async def handle_text(
     if not prompt:
         return
 
+    log.info("Текст, len=%d", len(prompt))
     waiting = await message.answer("⏳ Claude думает...")
 
-    response = await run_claude(prompt, uid, settings, app_state, storage=storage)
-    await send_long(message, response.text, settings.max_message_len)
-    if response.files:
-        await send_files(message, response.files)
-
-    await send_voice_if_enabled(message, response.text, uid, settings, app_state)
-    await safe_delete(waiting)
+    response = await call_claude_safe(
+        message, waiting, prompt, uid, settings, app_state, storage,
+    )
+    if response:
+        await send_voice_if_enabled(message, response.text, uid, settings, app_state)
