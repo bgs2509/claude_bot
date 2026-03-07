@@ -45,7 +45,7 @@ async def handle_document(
 
     try:
         with open(tmp_path, "r", encoding="utf-8", errors="replace") as f:
-            content = f.read()
+            content = f.read().replace("\x00", "")
     except Exception as e:
         await waiting.edit_text(f"Не удалось прочитать файл: {e}")
         return
