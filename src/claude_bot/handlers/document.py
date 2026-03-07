@@ -1,20 +1,26 @@
-"""Обработка документов (текстовые файлы)."""
+"""Обработка документов — сохранение в проект + передача Claude."""
 
 import asyncio
 import logging
 import os
-import tempfile
 
 from aiogram import F, Router
-from aiogram.types import Message
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from claude_bot.config import Settings
 from claude_bot.errors import get_user_message
 from claude_bot.middlewares.auth import check_rate_limit, track_usage
+from claude_bot.services.claude import get_project_dir
 from claude_bot.services.storage import SessionStorage
-from claude_bot.state import AppState
+from claude_bot.services.upload import (
+    build_file_prompt,
+    check_collision,
+    is_binary_file,
+    save_uploaded_file,
+)
+from claude_bot.state import AppState, PendingUpload
 
-from . import call_claude_safe
+from . import call_claude_safe, download_file
 
 router = Router(name="document")
 log = logging.getLogger("claude-bot.document")
@@ -35,39 +41,60 @@ async def handle_document(
     track_usage(uid, app_state)
 
     doc = message.document
-    if doc.file_size > 1_000_000:
-        await message.answer(get_user_message("file_too_large"))
+    if doc.file_size > settings.max_upload_size:
+        limit_mb = settings.max_upload_size // 1_048_576
+        await message.answer(get_user_message("file_too_large", limit_mb=limit_mb))
         return
-
-    log.info("Документ: %s (%d bytes)", doc.file_name, doc.file_size)
-    waiting = await message.answer("📄 Читаю файл...")
-
-    file = await message.bot.get_file(doc.file_id)
-    tmp_path = tempfile.mktemp(suffix=f"_{doc.file_name}")
-    await message.bot.download_file(file.file_path, tmp_path)
 
     try:
-        with open(tmp_path, "r", encoding="utf-8", errors="replace") as f:
-            content = f.read().replace("\x00", "")
-    except Exception:
-        log.error("Ошибка чтения файла %s", doc.file_name, exc_info=True)
-        await waiting.edit_text(get_user_message("file_read_error"))
+        project_dir = get_project_dir(settings, storage, uid)
+    except ValueError:
+        await message.answer(get_user_message("no_active_project"))
         return
-    finally:
-        try:
-            os.unlink(tmp_path)
-        except OSError:
-            pass
 
+    filename = doc.file_name or "unnamed_file"
+    binary = is_binary_file(filename, doc.mime_type)
     caption = message.caption or "Проанализируй этот файл"
-    prompt = (
-        f"Пользователь отправил файл `{doc.file_name}`:\n\n"
-        f"```\n{content[:10000]}\n```\n\n"
-        f"Задача: {caption}"
-    )
 
+    log.info("Документ: %s (%d bytes, binary=%s)", filename, doc.file_size, binary)
+    waiting = await message.answer("📄 Сохраняю файл в проект...")
+    tmp_path = await download_file(message.bot, doc.file_id, f"_{filename}")
+
+    # Очистить предыдущий pending если есть
+    old = app_state.pending_uploads.pop(uid, None)
+    if old:
+        _cleanup_tmp(old.tmp_path)
+
+    if check_collision(project_dir, filename):
+        app_state.pending_uploads[uid] = PendingUpload(
+            tmp_path=tmp_path,
+            target_dir=str(project_dir),
+            filename=filename,
+            is_binary=binary,
+            caption=caption,
+            chat_id=message.chat.id,
+        )
+        await waiting.edit_text(
+            get_user_message("file_collision", filename=filename),
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
+                InlineKeyboardButton(
+                    text="Перезаписать", callback_data="upload:overwrite",
+                ),
+                InlineKeyboardButton(
+                    text="Добавить дату", callback_data="upload:suffix",
+                ),
+            ]]),
+        )
+        return
+
+    saved = save_uploaded_file(tmp_path, project_dir, filename)
+    prompt = build_file_prompt(filename, saved, binary, caption)
     await waiting.edit_text("⏳ Claude думает...")
+    await call_claude_safe(message, waiting, prompt, uid, settings, app_state, storage)
 
-    await call_claude_safe(
-        message, waiting, prompt, uid, settings, app_state, storage,
-    )
+
+def _cleanup_tmp(path: str) -> None:
+    try:
+        os.unlink(path)
+    except OSError:
+        pass

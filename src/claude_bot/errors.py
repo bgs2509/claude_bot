@@ -22,7 +22,7 @@ USER_MESSAGES: dict[str, str] = {
         "• Отправить текстом"
     ),
     "file_too_large": (
-        "Файл слишком большой (макс 1MB).\n"
+        "Файл слишком большой (макс {limit_mb}MB).\n"
         "Попробуй отправить файл меньшего размера\n"
         "или скопировать нужный фрагмент текстом."
     ),
@@ -30,6 +30,11 @@ USER_MESSAGES: dict[str, str] = {
         "Не удалось прочитать файл.\n"
         "Поддерживаются текстовые файлы (UTF-8).\n"
         "Попробуй отправить содержимое текстом."
+    ),
+    "file_collision": "Файл `{filename}` уже существует в проекте.\nЧто сделать?",
+    "no_active_project": (
+        "Нет активного проекта.\n"
+        "Используй /menu для выбора или создания проекта."
     ),
     "unexpected_error": (
         "Произошла непредвиденная ошибка.\n"
@@ -41,6 +46,12 @@ USER_MESSAGES: dict[str, str] = {
 }
 
 
-def get_user_message(key: str) -> str:
-    """Получить user-friendly сообщение по ключу."""
-    return USER_MESSAGES.get(key, USER_MESSAGES["unexpected_error"])
+def get_user_message(key: str, **kwargs: str | int) -> str:
+    """Получить user-friendly сообщение. Поддерживает шаблоны: {param}."""
+    template = USER_MESSAGES.get(key, USER_MESSAGES["unexpected_error"])
+    if kwargs:
+        try:
+            return template.format(**kwargs)
+        except KeyError:
+            return template
+    return template

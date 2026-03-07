@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     tts_voice: str = "ru-RU-DmitryNeural"
     max_message_len: int = 4000
     claude_timeout: int = 600
+    max_upload_size: int = 20_971_520  # 20MB
     users: dict = {}
 
     model_config = {"env_file": ".env", "extra": "ignore"}

@@ -22,7 +22,7 @@ def is_tesseract_available(state: AppState) -> bool:
     return state.tesseract_available
 
 
-async def ocr_image(file_path: str, state: AppState) -> str:
+async def ocr_image(file_path: str, state: AppState, *, delete: bool = True) -> str:
     """Извлечь текст из изображения через tesseract."""
     if not is_tesseract_available(state):
         return "(tesseract не установлен — OCR недоступен)"
@@ -37,7 +37,8 @@ async def ocr_image(file_path: str, state: AppState) -> str:
     except Exception as e:
         return f"(ошибка OCR: {e})"
     finally:
-        try:
-            os.unlink(file_path)
-        except OSError:
-            pass
+        if delete:
+            try:
+                os.unlink(file_path)
+            except OSError:
+                pass

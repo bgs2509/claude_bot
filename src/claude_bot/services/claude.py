@@ -81,15 +81,26 @@ def _snapshot_media(cwd: Path) -> set[Path]:
     }
 
 
-def _collect_output_files(cwd: Path, before: set[Path]) -> list[Path]:
-    """Собрать файлы из _output/ и новые медиа из корня."""
+def _snapshot_output(cwd: Path) -> set[Path]:
+    """Снимок файлов в _output/."""
+    output_dir = cwd / "_output"
+    if not output_dir.exists():
+        return set()
+    return {p for p in output_dir.iterdir() if p.is_file()}
+
+
+def _collect_output_files(
+    cwd: Path, media_before: set[Path], output_before: set[Path],
+) -> list[Path]:
+    """Собрать НОВЫЕ файлы из _output/ и новые медиа из корня."""
     files: list[Path] = []
     output_dir = cwd / "_output"
     if output_dir.exists():
-        files.extend(p for p in output_dir.iterdir() if p.is_file())
+        after = {p for p in output_dir.iterdir() if p.is_file()}
+        files.extend(after - output_before)
     # Fallback: новые медиа-файлы в корне
-    after = _snapshot_media(cwd)
-    files.extend(after - before)
+    media_after = _snapshot_media(cwd)
+    files.extend(media_after - media_before)
     return files
 
 
@@ -106,13 +117,10 @@ async def run_claude(
     cwd = get_project_dir(settings, storage, uid)
     cwd.mkdir(parents=True, exist_ok=True)
 
-    # Подготовка _output/ и снимок медиа
+    # Подготовка _output/ и снимки для отслеживания новых файлов
     output_dir = cwd / "_output"
     output_dir.mkdir(exist_ok=True)
-    # Очистить _output/ от предыдущих запусков
-    for old_file in output_dir.iterdir():
-        if old_file.is_file():
-            old_file.unlink()
+    output_before = _snapshot_output(cwd)
     media_before = _snapshot_media(cwd)
 
     cmd = [
@@ -122,7 +130,8 @@ async def run_claude(
         "НИКОГДА не используй таблицы. "
         "Вместо таблиц используй маркированные или нумерованные списки. "
         "Форматирование: plain text, списки, переносы строк. "
-        "Файлы сохраняй в _output/. "
+        "Файлы сохраняй в _output/ с именами в формате YYYYMMDD_HHMMSS_краткое_описание.расширение "
+        "(например: 20260307_180000_анализ_продаж.csv). "
         "Пользователь общается через Telegram-бот. "
         "Он может просить выполнить bash-команды (cd, ls, mkdir, git и любые другие) — выполняй их. "
         "При смене директории сообщай текущий путь. "
@@ -224,7 +233,7 @@ async def run_claude(
             await storage.update_session_name(uid, sid, title)
 
     # Собрать файлы
-    collected_files = _collect_output_files(cwd, media_before)
+    collected_files = _collect_output_files(cwd, media_before, output_before)
 
     return ClaudeResponse(text=result_text, session_id=sid, files=collected_files)
 

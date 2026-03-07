@@ -3,7 +3,7 @@
 from aiogram import Bot, Dispatcher
 
 from claude_bot.config import Settings
-from claude_bot.handlers import commands, document, photo, text, voice
+from claude_bot.handlers import commands, document, photo, text, upload, voice
 from claude_bot.handlers.menu import router as menu_router
 from claude_bot.middlewares.auth import AuthMiddleware
 from claude_bot.middlewares.error import ErrorMiddleware
@@ -37,6 +37,7 @@ def create_dispatcher(
     # Роутеры (порядок важен: menu до text, text последним — ловит всё)
     dp.include_router(commands.router)
     dp.include_router(menu_router)
+    dp.include_router(upload.router)
     dp.include_router(voice.router)
     dp.include_router(photo.router)
     dp.include_router(document.router)
