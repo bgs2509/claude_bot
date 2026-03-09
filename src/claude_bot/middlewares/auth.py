@@ -8,15 +8,17 @@ from aiogram import BaseMiddleware
 from aiogram.types import Message, TelegramObject
 
 from claude_bot.config import Settings
+from claude_bot.services.ai.manager import AIManager
 from claude_bot.state import AppState
 
 
 class AuthMiddleware(BaseMiddleware):
     """Проверяет доступ пользователя и пробрасывает settings/state в data."""
 
-    def __init__(self, settings: Settings, state: AppState) -> None:
+    def __init__(self, settings: Settings, state: AppState, ai_manager: AIManager) -> None:
         self.settings = settings
         self.state = state
+        self.ai_manager = ai_manager
 
     async def __call__(
         self,
@@ -27,6 +29,7 @@ class AuthMiddleware(BaseMiddleware):
         # Пробрасываем зависимости в data
         data["settings"] = self.settings
         data["state"] = self.state
+        data["ai_manager"] = self.ai_manager
 
         # Проверяем доступ только для Message
         if isinstance(event, Message) and event.from_user:

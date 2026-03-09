@@ -7,7 +7,7 @@ from aiogram.filters import CommandStart, Command, CommandObject
 from aiogram.types import Message
 
 from claude_bot.config import Settings
-from claude_bot.services.claude import MODELS
+from claude_bot.services.ai.manager import AIManager
 from claude_bot.state import AppState
 
 router = Router(name="commands")
@@ -16,8 +16,8 @@ router = Router(name="commands")
 @router.message(CommandStart())
 async def cmd_start(message: Message) -> None:
     await message.answer(
-        "Claude Code Bot\n\n"
-        "Отправь текст, голосовое или фото — Claude ответит.\n\n"
+        "AI Code Bot\n\n"
+        "Отправь текст, голосовое или фото — бот передаст задачу выбранному AI-провайдеру.\n\n"
         "/help — справка и список команд"
     )
 
@@ -36,14 +36,16 @@ async def cmd_help(message: Message) -> None:
         "<b>Команды бота:</b>\n"
         "/new — новая сессия (сбросить контекст)\n"
         "/cancel — отменить текущий запрос\n"
-        "/model — сменить модель (haiku / sonnet / opus)\n"
+        "/provider — сменить AI-провайдера (claude / codex)\n"
+        "/model — сменить модель текущего провайдера\n"
+        "/reasoning — сменить уровень reasoning для текущего провайдера\n"
         "/voice — вкл/выкл голосовые ответы\n"
         "/status — текущее состояние\n"
         "/usage — твоя статистика за сегодня\n"
         "/stats — статистика всех (admin)\n\n"
 
         "<b>Навигация и bash:</b>\n"
-        "Claude понимает любые команды прямо в чате:\n"
+        "AI-провайдер может выполнять команды прямо в чате:\n"
         "• <code>ls</code> — список файлов\n"
         "• <code>cd my-project</code> — перейти в проект\n"
         "• <code>mkdir new-project && cd new-project</code>\n"
@@ -64,7 +66,9 @@ async def cmd_help(message: Message) -> None:
 @router.message(Command("new"))
 async def cmd_new(message: Message, state: AppState) -> None:
     uid = message.from_user.id
-    state.user_sessions.pop(uid, None)
+    ai_profile = state.user_ai.get(uid)
+    if ai_profile:
+        ai_profile.session_id = None
     await message.answer("Сессия сброшена. Следующее сообщение начнёт новую.")
 
 
@@ -79,24 +83,114 @@ async def cmd_cancel(message: Message, state: AppState) -> None:
         await message.answer("Нет активного запроса.")
 
 
-@router.message(Command("model"))
-async def cmd_model(message: Message, command: CommandObject, state: AppState) -> None:
+@router.message(Command("provider"))
+async def cmd_provider(
+    message: Message,
+    command: CommandObject,
+    settings: Settings,
+    state: AppState,
+    ai_manager: AIManager,
+) -> None:
     uid = message.from_user.id
     args = command.args
 
+    current = ai_manager.get_current_provider_name(uid, settings, state)
+    available = " | ".join(ai_manager.list_providers(settings))
+
     if not args:
-        current = state.user_models.get(uid, "sonnet")
-        names = " | ".join(MODELS.keys())
-        await message.answer(f"Модель: {current}\nДоступные: {names}")
+        await message.answer(f"Провайдер: {current}\nДоступные: {available}")
         return
 
-    name = args.strip().lower()
-    if name not in MODELS:
-        await message.answer(f"Неизвестная модель. Доступные: {' | '.join(MODELS.keys())}")
+    provider_name = args.strip().lower()
+    changed = provider_name != current
+    try:
+        ai_manager.set_provider(uid, provider_name, settings, state)
+    except ValueError as error:
+        await message.answer(str(error))
         return
 
-    state.user_models[uid] = name
-    await message.answer(f"Модель: {name}")
+    model = ai_manager.get_current_model(uid, settings, state)
+    lines = [
+        f"Провайдер: {provider_name}",
+        f"Модель по умолчанию: {model}",
+    ]
+    reasoning = ai_manager.get_current_reasoning(uid, settings, state)
+    if reasoning:
+        lines.append(f"Reasoning по умолчанию: {reasoning}")
+    if changed:
+        lines.append("Контекст предыдущего провайдера сброшен.")
+    await message.answer("\n".join(lines))
+
+
+@router.message(Command("model"))
+async def cmd_model(
+    message: Message,
+    command: CommandObject,
+    settings: Settings,
+    state: AppState,
+    ai_manager: AIManager,
+) -> None:
+    uid = message.from_user.id
+    args = command.args
+    provider = ai_manager.get_current_provider_name(uid, settings, state)
+    models = ai_manager.list_models(uid, settings, state)
+
+    if not args:
+        current = ai_manager.get_current_model(uid, settings, state)
+        await message.answer(
+            f"Провайдер: {provider}\n"
+            f"Модель: {current}\n"
+            f"Доступные: {' | '.join(models.keys())}"
+        )
+        return
+
+    model_name = args.strip()
+    try:
+        ai_manager.set_model(uid, model_name, settings, state)
+    except ValueError as error:
+        await message.answer(str(error))
+        return
+
+    current_model = ai_manager.get_current_model(uid, settings, state)
+    await message.answer(f"Провайдер: {provider}\nМодель: {current_model}")
+
+
+@router.message(Command("reasoning"))
+async def cmd_reasoning(
+    message: Message,
+    command: CommandObject,
+    settings: Settings,
+    state: AppState,
+    ai_manager: AIManager,
+) -> None:
+    uid = message.from_user.id
+    provider = ai_manager.get_current_provider_name(uid, settings, state)
+    reasoning_levels = ai_manager.list_reasoning_levels(uid, settings, state)
+
+    if not reasoning_levels:
+        await message.answer(
+            f"Провайдер: {provider}\n"
+            "Текущий провайдер не поддерживает настройку reasoning."
+        )
+        return
+
+    if not command.args:
+        current_reasoning = ai_manager.get_current_reasoning(uid, settings, state)
+        await message.answer(
+            f"Провайдер: {provider}\n"
+            f"Reasoning: {current_reasoning}\n"
+            f"Доступные: {' | '.join(reasoning_levels.keys())}"
+        )
+        return
+
+    try:
+        ai_manager.set_reasoning(uid, command.args.strip(), settings, state)
+    except ValueError as error:
+        await message.answer(str(error))
+        return
+
+    current_reasoning = ai_manager.get_current_reasoning(uid, settings, state)
+    await message.answer(f"Провайдер: {provider}\nReasoning: {current_reasoning}")
 
 
 @router.message(Command("voice"))
@@ -109,15 +203,24 @@ async def cmd_voice(message: Message, state: AppState) -> None:
 
 
 @router.message(Command("status"))
-async def cmd_status(message: Message, state: AppState, settings: Settings) -> None:
+async def cmd_status(
+    message: Message,
+    state: AppState,
+    settings: Settings,
+    ai_manager: AIManager,
+) -> None:
     uid = message.from_user.id
-    model = state.user_models.get(uid, "sonnet")
-    session = state.user_sessions.get(uid, "нет")
+    provider = ai_manager.get_current_provider_name(uid, settings, state)
+    model = ai_manager.get_current_model(uid, settings, state)
+    reasoning = ai_manager.get_current_reasoning(uid, settings, state) or "н/д"
+    session = ai_manager.get_user_profile(uid, settings, state).session_id or "нет"
     voice = "вкл" if state.user_voice_mode.get(uid, False) else "выкл"
     cwd = str(settings.projects_dir)
 
     await message.answer(
+        f"Провайдер: {provider}\n"
         f"Модель: {model}\n"
+        f"Reasoning: {reasoning}\n"
         f"Сессия: {session}\n"
         f"Голос: {voice}\n"
         f"Директория: {cwd}"

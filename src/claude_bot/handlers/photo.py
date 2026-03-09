@@ -5,8 +5,9 @@ from aiogram.types import Message
 
 from claude_bot.config import Settings
 from claude_bot.middlewares.auth import check_limit
-from claude_bot.services.claude import run_claude, send_long
+from claude_bot.services.ai.manager import AIManager
 from claude_bot.services.ocr import ocr_image
+from claude_bot.services.telegram_output import send_long
 from claude_bot.state import AppState
 
 from . import download_file, safe_delete, send_files
@@ -15,7 +16,13 @@ router = Router(name="photo")
 
 
 @router.message(F.photo)
-async def handle_photo(message: Message, settings: Settings, state: AppState) -> None:
+async def handle_photo(
+    message: Message,
+    settings: Settings,
+    state: AppState,
+    role: str,
+    ai_manager: AIManager,
+) -> None:
     uid = message.from_user.id
     if not check_limit(uid, settings, state):
         await message.answer("Дневной лимит сообщений исчерпан.")
@@ -35,9 +42,10 @@ async def handle_photo(message: Message, settings: Settings, state: AppState) ->
         f"Задача пользователя: {caption}"
     )
 
-    await waiting.edit_text("⏳ Claude думает...")
+    provider_name = ai_manager.get_current_provider_name(uid, settings, state)
+    await waiting.edit_text(f"⏳ {provider_name} обрабатывает запрос...")
 
-    response = await run_claude(prompt, uid, settings, state)
+    response = await ai_manager.run(prompt, uid, role, settings, state)
     await send_long(message, response.text, settings.max_message_len)
     if response.files:
         await send_files(message, response.files)
