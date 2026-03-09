@@ -1,8 +1,8 @@
-# Claude Code Telegram Bot
+# AI Code Telegram Bot
 
-Telegram-обёртка над Claude Code CLI — превращает Смартфон в терминал с ИИ.
+Telegram-обёртка над CLI-агентами — превращает смартфон в терминал с ИИ.
 
-**Для кого:** разработчики, которые хотят дать Claude Code доступ к своему серверу через Telegram — без SSH, без IDE, с телефона.
+**Для кого:** разработчики, которые хотят дать Claude Code или Codex доступ к своему серверу через Telegram — без SSH, без IDE, с телефона.
 
 **Сценарии использования:**
 
@@ -11,11 +11,11 @@ Telegram-обёртка над Claude Code CLI — превращает Смар
     - 🏖️ Сгенерить скрипт на пляже
     - ☕ Запустить ревью из очереди за кофе
     - 🖥️ Для больших проектов нужны IDE и терминал, но для быстрых правок хватает чата
-- 🤖 **Личный ИИ-ассистент** — Claude Code под капотом + файловая система + MCP-серверы
+- 🤖 **Личный ИИ-ассистент** — Claude Code или Codex под капотом + файловая система + MCP-серверы
     - 📄 Анализ документов и фото
     - 📁 Хранение и поиск файлов
     - 🔍 OCR, отчёты, голосовые команды
-    - 🧠 Бот умеет всё, что умеет Claude
+    - 🧠 Бот умеет всё, что умеет выбранный AI-провайдер
 - 👨‍👩‍👧‍👦 **ИИ для всей семьи** — один бот, несколько пользователей с разными ролями
     - 📚 Дети делают уроки
     - 🍳 Жена хранит рецепты
@@ -28,12 +28,13 @@ Telegram-обёртка над Claude Code CLI — превращает Смар
 
 ## Что умеет
 
-- **Текст** — вопросы, задачи, работа с кодом через Claude Code
-- **Голос** — распознавание речи (faster-whisper) → Claude → озвучка ответа (edge-tts)
-- **Фото** — OCR (tesseract) → Claude анализирует
+- **Текст** — вопросы, задачи, работа с кодом через Claude Code или Codex
+- **Голос** — распознавание речи (faster-whisper) → AI-провайдер → озвучка ответа (edge-tts)
+- **Фото** — OCR (tesseract) → AI-провайдер анализирует
 - **Документы** — чтение файлов и обработка содержимого
 - **MCP серверы** — GitHub, Playwright, Brave Search, PostgreSQL и другие
 - **Мультипользователь** — роли admin/user/readonly, дневные лимиты
+- **Переключение провайдера** — `claude` или `codex` на пользователя
 
 ---
 
@@ -56,8 +57,9 @@ make run
 |-----------|-------|--------------------|
 | **Python 3.11+** | Сам бот | `sudo apt install python3` |
 | **uv** | Пакетный менеджер | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
-| **Node.js 22+** | Claude Code CLI и MCP серверы | `curl -fsSL https://deb.nodesource.com/setup_22.x \| sudo bash -` |
-| **Claude Code CLI** | Мозги бота | `npm install -g @anthropic-ai/claude-code` |
+| **Node.js 22+** | Claude Code CLI, Codex CLI и MCP серверы | `curl -fsSL https://deb.nodesource.com/setup_22.x \| sudo bash -` |
+| **Claude Code CLI** | Один из AI-провайдеров | `npm install -g @anthropic-ai/claude-code` |
+| **Codex CLI** | Второй AI-провайдер | Устанавливается отдельно в вашей среде |
 | **ffmpeg** | Конвертация голосовых OGG → WAV | `sudo apt install ffmpeg` |
 | **tesseract-ocr** | Распознавание текста на фото | `sudo apt install tesseract-ocr tesseract-ocr-rus` |
 
@@ -70,7 +72,9 @@ make run
 | `/help` | Справка и список команд |
 | `/new` | Новая сессия (сброс контекста) |
 | `/cancel` | Отменить текущий запрос |
-| `/model` | Сменить модель (haiku / sonnet / opus) |
+| `/provider` | Сменить AI-провайдера |
+| `/model` | Сменить модель текущего провайдера |
+| `/reasoning` | Сменить reasoning текущего провайдера |
 | `/voice` | Вкл/выкл голосовые ответы |
 | `/status` | Текущее состояние |
 | `/usage` | Статистика за сегодня |
@@ -102,8 +106,15 @@ claude_bot/
 │   ├── middlewares/
 │   │   └── auth.py            # Авторизация + check_limit
 │   └── services/
-│       ├── claude.py          # ClaudeResponse, run_claude, send_long
+│       ├── ai/
+│       │   ├── manager.py     # Выбор провайдера и маршрутизация запросов
+│       │   ├── base.py        # Общие типы AIRequest/AIResponse
+│       │   └── providers/
+│       │       ├── claude_cli.py
+│       │       └── codex_cli.py
+│       ├── claude.py          # Compatibility shim для старого API
 │       ├── format_telegram.py # Markdown → Telegram HTML
+│       ├── telegram_output.py # Отправка длинных ответов
 │       ├── speech.py          # transcribe_voice, synthesize_speech
 │       └── ocr.py             # ocr_image
 ├── configs/
