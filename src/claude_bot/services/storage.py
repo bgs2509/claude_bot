@@ -7,7 +7,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
-log = logging.getLogger("claude-bot")
+log = logging.getLogger("claude-bot.storage")
 
 
 def _now_iso() -> str:

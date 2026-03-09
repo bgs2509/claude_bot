@@ -24,6 +24,7 @@
 | [006](006-modular-architecture.md) | Модульная архитектура handlers/services/middlewares | Принято | 2026-03-06 |
 | [007](007-pydantic-settings.md) | pydantic-settings для конфигурации | Принято | 2026-03-06 |
 | [008](008-uv.md) | uv как пакетный менеджер | Принято | 2026-03-06 |
+| [009](009-observability.md) | Observability-стек (JSON-логи + SQLite + Sentry) | Принято | 2026-03-09 |
 
 ## Шаблон нового ADR
 

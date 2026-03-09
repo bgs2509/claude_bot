@@ -14,7 +14,7 @@ from claude_bot.state import AppState
 from . import call_claude_safe
 
 router = Router(name="upload")
-log = logging.getLogger("claude-bot.upload")
+log = logging.getLogger("claude-bot.handlers.upload")
 
 
 @router.callback_query(F.data == "upload:overwrite")

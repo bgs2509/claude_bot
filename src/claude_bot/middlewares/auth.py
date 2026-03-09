@@ -98,6 +98,7 @@ def check_rate_limit(uid: int, settings: Settings, state: AppState) -> float:
     if len(times) >= max_requests:
         wait = window - (now - times[0])
         state.user_request_times[uid] = times
+        log.info("Rate-limit: uid=%d, ждать=%.0fs", uid, wait)
         return max(wait, 0.1)
 
     times.append(now)

@@ -1,5 +1,6 @@
 """Обработчики команд бота."""
 
+import logging
 from datetime import date
 
 from aiogram import Router
@@ -13,10 +14,12 @@ from claude_bot.services.storage import SessionStorage
 from claude_bot.state import AppState
 
 router = Router(name="commands")
+log = logging.getLogger("claude-bot.commands")
 
 
 @router.message(CommandStart())
 async def cmd_start(message: Message) -> None:
+    log.info("Команда /start")
     await message.answer(
         "Claude Code Bot\n\n"
         "Что умею:\n"
@@ -29,6 +32,7 @@ async def cmd_start(message: Message) -> None:
 
 @router.message(Command("help"))
 async def cmd_help(message: Message) -> None:
+    log.info("Команда /help")
     await message.answer(
         "📖 <b>Как пользоваться ботом</b>\n\n"
 
@@ -72,6 +76,7 @@ async def cmd_new(
     message: Message, app_state: AppState, storage: SessionStorage | None = None,
 ) -> None:
     uid = message.from_user.id
+    log.info("Команда /new — сброс сессии")
     app_state.user_sessions.pop(uid, None)
     if storage:
         await storage.create_new_session(uid)
@@ -93,8 +98,10 @@ async def cmd_cancel(
     proc = app_state.active_processes.pop(uid, None)
     if proc:
         proc.kill()
+        log.info("Команда /cancel — killed")
         await message.answer("Запрос отменён.")
     else:
+        log.info("Команда /cancel — нет процесса")
         await message.answer("Нет активного запроса.")
 
 
@@ -119,6 +126,7 @@ async def cmd_model(message: Message, command: CommandObject, app_state: AppStat
         return
 
     app_state.user_models[uid] = name
+    log.info("Команда /model: %s", name)
     await message.answer(f"Модель: {name}")
 
 
@@ -128,6 +136,7 @@ async def cmd_voice(message: Message, app_state: AppState) -> None:
     current = app_state.user_voice_mode.get(uid, False)
     app_state.user_voice_mode[uid] = not current
     status = "включён" if not current else "выключен"
+    log.info("Команда /voice: %s", status)
     await message.answer(f"Голосовой режим {status}")
 
 
@@ -138,6 +147,7 @@ async def cmd_status(
     settings: Settings,
     storage: SessionStorage | None = None,
 ) -> None:
+    log.info("Команда /status")
     uid = message.from_user.id
     # Определить актуальную модель с учётом конфига
     user_cfg = settings.users.get(str(uid))
@@ -175,6 +185,7 @@ async def cmd_status(
 
 @router.message(Command("usage"))
 async def cmd_usage(message: Message, settings: Settings, app_state: AppState) -> None:
+    log.info("Команда /usage")
     uid = message.from_user.id
     count_data = app_state.user_daily_count.get(uid, {})
     today = date.today().isoformat()
@@ -189,6 +200,7 @@ async def cmd_usage(message: Message, settings: Settings, app_state: AppState) -
 
 @router.message(Command("stats"))
 async def cmd_stats(message: Message, settings: Settings, app_state: AppState, role: str) -> None:
+    log.info("Команда /stats")
     if role != "admin":
         await message.answer("Только для admin.")
         return

@@ -28,6 +28,11 @@ class ErrorMiddleware(BaseMiddleware):
         except Exception:
             log.error("Необработанное исключение", exc_info=True)
             try:
+                import sentry_sdk
+                sentry_sdk.capture_exception()
+            except Exception:
+                pass
+            try:
                 if isinstance(event, Message):
                     await event.answer(get_user_message("unexpected_error"))
                 elif isinstance(event, CallbackQuery):

@@ -7,6 +7,7 @@ from aiogram import F, Router
 from aiogram.types import Message
 
 from claude_bot.config import Settings
+from claude_bot.context import obs_status_var
 from claude_bot.middlewares.auth import check_rate_limit, track_usage
 from claude_bot.services.storage import SessionStorage
 from claude_bot.state import AppState
@@ -27,6 +28,7 @@ async def handle_text(
     uid = message.from_user.id
     wait = check_rate_limit(uid, settings, app_state)
     if wait > 0:
+        obs_status_var.set("rate_limited")
         await asyncio.sleep(wait)
         # После ожидания — зарегистрировать запрос
         check_rate_limit(uid, settings, app_state)

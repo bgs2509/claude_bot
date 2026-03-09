@@ -5,7 +5,7 @@ import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
-log = logging.getLogger("claude-bot.upload")
+log = logging.getLogger("claude-bot.services.upload")
 
 # Расширения, которые точно текстовые
 TEXT_EXTENSIONS: set[str] = {

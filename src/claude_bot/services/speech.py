@@ -8,7 +8,7 @@ import tempfile
 from claude_bot.config import Settings
 from claude_bot.state import AppState
 
-log = logging.getLogger("claude-bot")
+log = logging.getLogger("claude-bot.speech")
 
 
 def get_whisper_model(settings: Settings, state: AppState):
@@ -80,6 +80,7 @@ async def synthesize_speech(text: str, settings: Settings) -> str | None:
     try:
         import edge_tts
     except ImportError:
+        log.warning("TTS: edge_tts не установлен")
         return None
 
     # Ограничить длину текста для TTS (edge-tts имеет лимит)
@@ -89,4 +90,5 @@ async def synthesize_speech(text: str, settings: Settings) -> str | None:
     output_path = tempfile.mktemp(suffix=".mp3")
     communicate = edge_tts.Communicate(text, settings.tts_voice)
     await communicate.save(output_path)
+    log.info("TTS: %d символов синтезировано", len(text))
     return output_path

@@ -119,6 +119,7 @@ async def cb_select_project(callback: CallbackQuery, storage: SessionStorage, se
     if not ok:
         await callback.answer(f"Проект '{name}' не найден", show_alert=True)
         return
+    log.info("Меню: проект выбран %s", name)
 
     text = _menu_text(storage, uid)
     markup = _main_menu_markup(storage, uid, settings)
@@ -156,6 +157,7 @@ async def process_project_name(
     uid = message.from_user.id
     projects_dir = get_user_projects_dir(settings, uid)
     await storage.create_project(uid, name, projects_dir)
+    log.info("Меню: проект создан %s", name)
     await state.clear()
 
     text = _menu_text(storage, uid)
@@ -202,6 +204,7 @@ async def cb_select_session(callback: CallbackQuery, storage: SessionStorage, se
     if not ok:
         await callback.answer("Сессия не найдена", show_alert=True)
         return
+    log.info("Меню: сессия выбрана %s", sid[:8])
 
     text = _menu_text(storage, uid)
     markup = _main_menu_markup(storage, uid, settings)
@@ -218,6 +221,7 @@ async def cb_select_session(callback: CallbackQuery, storage: SessionStorage, se
 async def cb_new_session(callback: CallbackQuery, storage: SessionStorage, settings: Settings) -> None:
     uid = callback.from_user.id
     await storage.create_new_session(uid)
+    log.info("Меню: новая сессия")
 
     text = _menu_text(storage, uid)
     markup = _main_menu_markup(storage, uid, settings)

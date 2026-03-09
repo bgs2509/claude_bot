@@ -23,7 +23,7 @@ from claude_bot.state import AppState
 if TYPE_CHECKING:
     from claude_bot.services.storage import SessionStorage
 
-log = logging.getLogger("claude-bot")
+log = logging.getLogger("claude-bot.claude")
 
 MEDIA_EXTENSIONS = {
     ".png", ".jpg", ".jpeg", ".gif", ".webp",

@@ -6,7 +6,7 @@ import subprocess
 
 from claude_bot.state import AppState
 
-log = logging.getLogger("claude-bot")
+log = logging.getLogger("claude-bot.ocr")
 
 
 def is_tesseract_available(state: AppState) -> bool:
@@ -25,6 +25,7 @@ def is_tesseract_available(state: AppState) -> bool:
 async def ocr_image(file_path: str, state: AppState, *, delete: bool = True) -> str:
     """Извлечь текст из изображения через tesseract."""
     if not is_tesseract_available(state):
+        log.warning("OCR: tesseract недоступен")
         return "(tesseract не установлен — OCR недоступен)"
 
     try:
@@ -33,7 +34,11 @@ async def ocr_image(file_path: str, state: AppState, *, delete: bool = True) -> 
 
         image = Image.open(file_path)
         text = pytesseract.image_to_string(image, lang="rus+eng")
-        return text.strip() if text.strip() else "(текст на фото не распознан)"
+        if text.strip():
+            log.info("OCR: %d символов из %s", len(text.strip()), file_path)
+            return text.strip()
+        log.info("OCR: текст не распознан в %s", file_path)
+        return "(текст на фото не распознан)"
     except Exception as e:
         return f"(ошибка OCR: {e})"
     finally:

@@ -20,6 +20,18 @@ class Settings(BaseSettings):
     max_upload_size: int = 20_971_520  # 20MB
     users: dict = {}
 
+    # Логирование
+    log_file: Path = Path("data/bot.log")
+    log_max_bytes: int = 10_485_760  # 10 MB
+    log_backup_count: int = 5
+
+    # Sentry (пустая строка = отключено)
+    sentry_dsn: str = ""
+
+    # Аналитика
+    analytics_db: Path = Path("data/analytics.db")
+    analytics_retention_days: int = 90
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
     @field_validator("users", mode="before")

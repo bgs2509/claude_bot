@@ -10,6 +10,7 @@ from aiogram import Bot, types
 from aiogram.types import FSInputFile
 
 from claude_bot.config import Settings
+from claude_bot.context import obs_output_var, obs_status_var
 from claude_bot.errors import get_user_message
 from claude_bot.services.claude import ClaudeResponse, run_claude, send_long
 from claude_bot.services.speech import synthesize_speech
@@ -89,9 +90,12 @@ async def call_claude_safe(
         await send_long(message, response.text, settings.max_message_len)
         if response.files:
             await send_files(message, response.files)
+        obs_status_var.set("claude_success")
+        obs_output_var.set(response.text[:80])
         return response
     except Exception:
         log.error("Ошибка run_claude", exc_info=True)
+        obs_status_var.set("claude_error")
         await message.answer(get_user_message("claude_error"))
         return None
     finally:
