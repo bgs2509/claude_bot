@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import os
+import signal
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -89,7 +90,8 @@ async def run_claude(
         "Файлы сохраняй в _output/. "
         "Пользователь общается через Telegram-бот. "
         "Он может просить выполнить bash-команды (cd, ls, mkdir, git и любые другие) — выполняй их. "
-        "При смене директории сообщай текущий путь.",
+        "При смене директории сообщай текущий путь. "
+        "Долгие процессы (серверы, make dev, npm start, yarn dev и т.п.) запускай в фоне: nohup <команда> &> /tmp/bot_proc.log & disown. Сообщай PID и путь к логу.",
     ]
 
     # Модель пользователя
@@ -100,7 +102,10 @@ async def run_claude(
     # Продолжить сессию если есть
     session_id = state.user_sessions.get(uid)
     if session_id:
+        log.info("[uid=%s] resuming session %s", uid, session_id)
         cmd += ["--resume", session_id]
+    else:
+        log.info("[uid=%s] no session, starting new", uid)
 
     # Права: admin и user — полный доступ, readonly — только чтение
     cfg = settings.users.get(str(uid))
