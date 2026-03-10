@@ -1,4 +1,4 @@
-.PHONY: run install clean help
+.PHONY: run install clean help vps
 
 help:  ## Показать справку
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -9,6 +9,12 @@ run:  ## Запустить бота
 
 install:  ## Установить зависимости
 	uv sync
+
+vps:  ## Установить и перезапустить systemd-сервис
+	sudo cp claude-bot.service /etc/systemd/system/
+	sudo systemctl daemon-reload
+	sudo systemctl enable claude-bot
+	sudo systemctl restart claude-bot
 
 clean:  ## Удалить кэш и .venv
 	rm -rf .venv

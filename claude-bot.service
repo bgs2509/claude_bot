@@ -5,10 +5,10 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=claude
-Group=claude
-WorkingDirectory=/home/claude/claude-bot
-ExecStart=/home/claude/.local/bin/uv run --project /home/claude/claude-bot claude-bot
+User=bgs
+Group=bgs
+WorkingDirectory=/opt/claude_bot
+ExecStart=/home/bgs/.local/bin/uv run --project /opt/claude_bot claude-bot
 Restart=always
 RestartSec=10
 StandardOutput=journal
@@ -18,7 +18,7 @@ SyslogIdentifier=claude-bot
 # Безопасность
 NoNewPrivileges=yes
 ProtectSystem=strict
-ReadWritePaths=/home/claude
+ReadWritePaths=/opt/claude_bot /home/bgs
 PrivateTmp=yes
 
 [Install]
