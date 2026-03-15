@@ -51,11 +51,11 @@ def _status_text(
         session_name = None
 
     if project_name:
-        line1 = f"{EMOJI_ACTIVE} {project_name}"
-        if session_name:
-            line1 += f" · {session_name}"
+        line_project = f"📂 Проект: {project_name}"
+        line_session = f"💬 Сессия: {session_name}" if session_name else ""
     else:
-        line1 = f"{EMOJI_HOME} Общий"
+        line_project = f"{EMOJI_HOME} Проект: Общий"
+        line_session = f"💬 Сессия: {session_name}" if session_name else ""
 
     # Модель и голос
     user_cfg = settings.users.get(str(uid))
@@ -68,8 +68,13 @@ def _status_text(
     else:
         model = app_state.user_models.get(uid, "sonnet")
     voice = "вкл" if app_state.user_voice_mode.get(uid, False) else "выкл"
+    line_settings = f"🤖 Модель: {model} · 🔇 Голос: {voice}"
 
-    return f"{line1}\nМодель: {model} · Голос: {voice}"
+    lines = [line_project]
+    if line_session:
+        lines.append(line_session)
+    lines.append(line_settings)
+    return "\n".join(lines)
 
 
 # ── /start ──
