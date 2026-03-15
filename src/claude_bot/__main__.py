@@ -2,7 +2,9 @@
 
 import asyncio
 import logging
+import sys
 
+from claude_bot import __version__
 from claude_bot.bot import create_bot, create_dispatcher
 from claude_bot.config import Settings
 from claude_bot.logging_setup import setup_logging, setup_sentry
@@ -25,8 +27,10 @@ async def _run(settings: Settings) -> None:
     state = AppState()
     storage = SessionStorage(settings.sessions_file)
 
-    log.info("Claude Code Telegram Bot запущен")
-    log.info("Пользователей: %s", len(settings.users) or "без ограничений")
+    log.info(
+        "Startup: service=claude-bot version=%s python=%s users=%d",
+        __version__, sys.version.split()[0], len(settings.users),
+    )
     for uid_str, cfg in settings.users.items():
         log.info("  %s (%s): %s", cfg.get("name", uid_str), uid_str, cfg["projects_dir"])
     log.info("Whisper модель: %s (device=%s)", settings.whisper_model, settings.whisper_device)

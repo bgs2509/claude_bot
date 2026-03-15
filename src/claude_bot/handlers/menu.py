@@ -29,13 +29,7 @@ def _menu_text(storage: SessionStorage, uid: int) -> str:
     """Текст для главного меню с контекстом."""
     user = storage.get_user(uid)
     proj = user.active_project or "—"
-    pd = storage._get_project_data(uid)
-    sess = "—"
-    if pd.active_session:
-        for s in pd.sessions:
-            if s.id == pd.active_session:
-                sess = s.name
-                break
+    sess = storage.get_active_session_name(uid) or "—"
     return f"Project: {proj}\nSession: {sess}"
 
 

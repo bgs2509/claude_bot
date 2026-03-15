@@ -58,7 +58,10 @@ class AuthMiddleware(BaseMiddleware):
             user_id_var.set(str(uid))
 
             if not self._is_allowed(uid):
-                log.warning("Доступ запрещён: @%s", user.username)
+                log.warning(
+                    "Доступ запрещён: uid=%d, username=@%s, reason=user_not_in_allowlist",
+                    uid, user.username,
+                )
                 if isinstance(event, CallbackQuery):
                     await event.answer("Доступ запрещён", show_alert=True)
                 elif isinstance(event, Message):
@@ -80,7 +83,16 @@ class AuthMiddleware(BaseMiddleware):
 
 
 def check_rate_limit(uid: int, settings: Settings, state: AppState) -> float:
-    """Проверить rate-limit для роли user. Возвращает 0 если можно, иначе секунды ожидания."""
+    """Проверить rate-limit для роли user.
+
+    Args:
+        uid: Telegram user ID.
+        settings: Конфигурация бота с данными пользователей.
+        state: In-memory состояние с историей запросов.
+
+    Returns:
+        0.0 если запрос разрешён, иначе количество секунд ожидания.
+    """
     cfg = settings.users.get(str(uid))
     if not cfg:
         return 0.0
@@ -98,7 +110,10 @@ def check_rate_limit(uid: int, settings: Settings, state: AppState) -> float:
     if len(times) >= max_requests:
         wait = window - (now - times[0])
         state.user_request_times[uid] = times
-        log.info("Rate-limit: uid=%d, ждать=%.0fs", uid, wait)
+        log.info(
+            "Rate-limit: uid=%d, reason=exceeded, window=%.0fs, max=%d, wait=%.0fs",
+            uid, window, max_requests, wait,
+        )
         return max(wait, 0.1)
 
     times.append(now)

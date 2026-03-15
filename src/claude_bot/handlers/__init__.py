@@ -13,7 +13,8 @@ from claude_bot.config import Settings, get_user_projects_dir
 from claude_bot.context import obs_output_var, obs_status_var
 from claude_bot.errors import get_user_message
 from claude_bot.keyboards import build_project_reply_keyboard
-from claude_bot.services.claude import ClaudeResponse, run_claude, send_long
+from claude_bot.services.claude import ClaudeResponse, run_claude
+from claude_bot.services.format_telegram import markdown_to_telegram_html
 from claude_bot.services.speech import synthesize_speech
 from claude_bot.state import AppState
 
@@ -67,6 +68,48 @@ async def send_voice_if_enabled(
             pass
 
 
+async def _send_html_or_plain(
+    message: types.Message,
+    text: str,
+    reply_markup: types.ReplyKeyboardMarkup | None = None,
+) -> None:
+    """Отправить сообщение как HTML, при ошибке — plain text."""
+    formatted = markdown_to_telegram_html(text)
+    try:
+        await message.answer(formatted, parse_mode="HTML", reply_markup=reply_markup)
+    except Exception:
+        log.debug("HTML parse failed, fallback to plain", exc_info=True)
+        await message.answer(text, reply_markup=reply_markup)
+
+
+async def send_long(
+    message: types.Message,
+    text: str,
+    max_len: int = 4000,
+    reply_markup: types.ReplyKeyboardMarkup | None = None,
+) -> None:
+    """Отправка ответа. Если > max_len — первый чанк + .md файл."""
+    if not text.strip():
+        text = "(пустой ответ)"
+
+    if len(text) <= max_len:
+        await _send_html_or_plain(message, text, reply_markup=reply_markup)
+        return
+
+    # Первый чанк + файл с полным ответом
+    preview = text[:max_len]
+    await _send_html_or_plain(message, preview)
+
+    md_path = tempfile.mktemp(suffix=".md")
+    with open(md_path, "w", encoding="utf-8") as f:
+        f.write(text)
+    doc = FSInputFile(md_path, filename="response.md")
+    await message.answer_document(
+        doc, caption="Полный ответ в файле", reply_markup=reply_markup,
+    )
+    os.unlink(md_path)
+
+
 async def send_files(message: types.Message, files: list[Path]) -> None:
     """Отправить файлы пользователю. Изображения — как фото, остальное — как документы."""
     for file_path in files:
@@ -84,7 +127,7 @@ async def safe_delete(message: types.Message) -> None:
     try:
         await message.delete()
     except Exception:
-        pass
+        log.debug("safe_delete failed", exc_info=True)
 
 
 async def call_claude_safe(
@@ -98,7 +141,17 @@ async def call_claude_safe(
 ) -> ClaudeResponse | None:
     """Вызвать run_claude с обработкой ошибок и cleanup waiting-сообщения.
 
-    Возвращает ClaudeResponse или None при ошибке.
+    Args:
+        message: Сообщение пользователя для ответа.
+        waiting: Сообщение-индикатор ожидания (удаляется в finally).
+        prompt: Текст запроса для Claude.
+        uid: Telegram user ID.
+        settings: Конфигурация бота.
+        app_state: In-memory состояние приложения.
+        storage: Хранилище сессий (опционально).
+
+    Returns:
+        ClaudeResponse или None при ошибке.
     """
     try:
         response = await run_claude(prompt, uid, settings, app_state, storage=storage)

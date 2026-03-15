@@ -7,17 +7,12 @@ import json
 import logging
 import os
 import re
-import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from aiogram import types
-from aiogram.types import FSInputFile
-
 from claude_bot.config import Settings, get_user_projects_dir
 from claude_bot.errors import get_user_message
-from claude_bot.services.format_telegram import markdown_to_telegram_html
 from claude_bot.state import AppState
 
 if TYPE_CHECKING:
@@ -113,7 +108,22 @@ async def run_claude(
     *,
     _retry: bool = False,
 ) -> ClaudeResponse:
-    """Запустить Claude Code CLI и получить результат."""
+    """Запустить Claude Code CLI и получить результат.
+
+    Args:
+        prompt: Текст запроса пользователя.
+        uid: Telegram user ID.
+        settings: Конфигурация бота.
+        app_state: In-memory состояние приложения.
+        storage: Хранилище сессий (опционально).
+        _retry: Внутренний флаг повторной попытки при невалидной сессии.
+
+    Returns:
+        ClaudeResponse с текстом ответа, session_id и списком файлов.
+
+    Raises:
+        asyncio.TimeoutError: Перехватывается внутри, возвращает user-friendly сообщение.
+    """
     cwd = get_project_dir(settings, storage, uid)
     cwd.mkdir(parents=True, exist_ok=True)
 
@@ -238,42 +248,3 @@ async def run_claude(
     return ClaudeResponse(text=result_text, session_id=sid, files=collected_files)
 
 
-async def _send_html_or_plain(
-    message: types.Message,
-    text: str,
-    reply_markup: types.ReplyKeyboardMarkup | None = None,
-) -> None:
-    """Отправить сообщение как HTML, при ошибке — plain text."""
-    formatted = markdown_to_telegram_html(text)
-    try:
-        await message.answer(formatted, parse_mode="HTML", reply_markup=reply_markup)
-    except Exception:
-        await message.answer(text, reply_markup=reply_markup)
-
-
-async def send_long(
-    message: types.Message,
-    text: str,
-    max_len: int = 4000,
-    reply_markup: types.ReplyKeyboardMarkup | None = None,
-) -> None:
-    """Отправка ответа. Если > max_len — первый чанк + .md файл."""
-    if not text.strip():
-        text = "(пустой ответ)"
-
-    if len(text) <= max_len:
-        await _send_html_or_plain(message, text, reply_markup=reply_markup)
-        return
-
-    # Первый чанк + файл с полным ответом
-    preview = text[:max_len]
-    await _send_html_or_plain(message, preview)
-
-    md_path = tempfile.mktemp(suffix=".md")
-    with open(md_path, "w", encoding="utf-8") as f:
-        f.write(text)
-    doc = FSInputFile(md_path, filename="response.md")
-    await message.answer_document(
-        doc, caption="Полный ответ в файле", reply_markup=reply_markup,
-    )
-    os.unlink(md_path)

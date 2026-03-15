@@ -173,12 +173,7 @@ async def cmd_status(
     if storage:
         user = storage.get_user(uid)
         project_name = user.active_project or "—"
-        pd = storage._get_project_data(uid)
-        if pd.active_session:
-            for s in pd.sessions:
-                if s.id == pd.active_session:
-                    session_name = s.name
-                    break
+        session_name = storage.get_active_session_name(uid) or "—"
 
     await message.answer(
         f"Проект: {project_name}\n"

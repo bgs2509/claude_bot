@@ -55,3 +55,19 @@ def get_user_message(key: str, **kwargs: str | int) -> str:
         except KeyError:
             return template
     return template
+
+
+class AppError(Exception):
+    """Базовое исключение приложения."""
+
+    def __init__(self, message: str, user_message_key: str = "unexpected_error") -> None:
+        super().__init__(message)
+        self.user_message_key = user_message_key
+
+
+class DomainError(AppError):
+    """Ошибка бизнес-логики (ожидаемая, не требует stack trace)."""
+
+
+class InfrastructureError(AppError):
+    """Ошибка инфраструктуры (внешние сервисы, ФС, CLI)."""

@@ -45,6 +45,11 @@ class SessionStorage:
     """CRUD-хранилище сессий в JSON-файле. Проекты — из ФС."""
 
     def __init__(self, path: Path) -> None:
+        """Инициализация хранилища.
+
+        Args:
+            path: Путь к JSON-файлу для персистентного хранения.
+        """
         self._path = path
         self._lock = asyncio.Lock()
         self._data: dict[int, UserData] = {}
@@ -122,6 +127,7 @@ class SessionStorage:
             user.projects[name] = ProjectData()
         user.active_project = name
         await self._save()
+        log.info("create_project: uid=%d, name=%s", uid, name)
 
     async def clear_active_project(self, uid: int) -> None:
         """Сбросить активный проект (работа в общей директории)."""
@@ -139,6 +145,7 @@ class SessionStorage:
         if name not in user.projects:
             user.projects[name] = ProjectData()
         await self._save()
+        log.info("set_active_project: uid=%d, name=%s", uid, name)
         return True
 
     async def restore_last_session(self, uid: int) -> str | None:
@@ -175,6 +182,23 @@ class SessionStorage:
     def get_active_session_id(self, uid: int) -> str | None:
         return self._get_project_data(uid).active_session
 
+    def get_active_session_name(self, uid: int) -> str | None:
+        """Имя активной сессии текущего проекта.
+
+        Args:
+            uid: Telegram user ID.
+
+        Returns:
+            Имя сессии или None если нет активной.
+        """
+        pd = self._get_project_data(uid)
+        if not pd.active_session:
+            return None
+        for s in pd.sessions:
+            if s.id == pd.active_session:
+                return s.name
+        return None
+
     async def save_session(
         self, uid: int, session_id: str, name: str | None = None,
     ) -> None:
@@ -188,12 +212,14 @@ class SessionStorage:
                     s.name = name
                 pd.active_session = session_id
                 await self._save()
+                log.info("save_session: uid=%d, sid=%s", uid, session_id[:8])
                 return
         # Новая сессия
         sname = name or f"Session {len(pd.sessions) + 1}"
         pd.sessions.append(SessionInfo(id=session_id, name=sname))
         pd.active_session = session_id
         await self._save()
+        log.info("save_session: uid=%d, sid=%s (new)", uid, session_id[:8])
 
     async def update_session_name(
         self, uid: int, session_id: str, name: str,
@@ -213,6 +239,7 @@ class SessionStorage:
                 s.last_used = _now_iso()
                 pd.active_session = session_id
                 await self._save()
+                log.info("set_active_session: uid=%d, sid=%s", uid, session_id[:8])
                 return True
         return False
 

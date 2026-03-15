@@ -8,7 +8,7 @@ from aiogram import BaseMiddleware
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery, Message, TelegramObject
 
-from claude_bot.errors import get_user_message
+from claude_bot.errors import AppError, DomainError, get_user_message
 
 log = logging.getLogger("claude-bot.error")
 
@@ -26,6 +26,28 @@ class ErrorMiddleware(BaseMiddleware):
             return await handler(event, data)
         except (SystemExit, KeyboardInterrupt):
             raise
+        except DomainError as exc:
+            log.warning("Domain error: %s", exc)
+            msg = get_user_message(exc.user_message_key)
+            try:
+                if isinstance(event, Message):
+                    await event.answer(msg)
+                elif isinstance(event, CallbackQuery):
+                    await event.answer(msg, show_alert=True)
+            except Exception:
+                log.error("Не удалось отправить сообщение об ошибке")
+            return None
+        except AppError as exc:
+            log.error("App error: %s", exc, exc_info=True)
+            msg = get_user_message(exc.user_message_key)
+            try:
+                if isinstance(event, Message):
+                    await event.answer(msg)
+                elif isinstance(event, CallbackQuery):
+                    await event.answer(msg, show_alert=True)
+            except Exception:
+                log.error("Не удалось отправить сообщение об ошибке")
+            return None
         except Exception as exc:
             # Безобидный race condition при двойном нажатии кнопки
             if isinstance(exc, TelegramBadRequest) and "is not modified" in str(exc):
