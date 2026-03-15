@@ -1,6 +1,11 @@
-"""Билдер inline-клавиатур для меню проектов и сессий."""
+"""Билдер inline- и reply-клавиатур для меню проектов и сессий."""
 
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    KeyboardButton,
+    ReplyKeyboardMarkup,
+)
 
 
 def build_main_menu(
@@ -90,3 +95,50 @@ def build_paginated_keyboard(
     ])
 
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def build_project_reply_keyboard(
+    projects: list[str],
+    active_project: str | None,
+    max_buttons: int = 6,
+) -> ReplyKeyboardMarkup:
+    """Reply-клавиатура с проектами для быстрого переключения.
+
+    Args:
+        projects: Список имён проектов (отсортирован по mtime).
+        active_project: Имя текущего активного проекта.
+        max_buttons: Максимум кнопок проектов (без служебных).
+    """
+    buttons: list[str] = []
+
+    # Текущий проект первым с маркером
+    if active_project and active_project in projects:
+        buttons.append(f"📂 {active_project}")
+        remaining = [p for p in projects if p != active_project]
+    else:
+        remaining = list(projects)
+
+    # Остальные с префиксом 📁
+    for p in remaining[: max_buttons - len(buttons)]:
+        buttons.append(f"📁 {p}")
+
+    # "Ещё" если есть скрытые проекты
+    if len(projects) > len(buttons):
+        buttons.append("📋 Ещё")
+
+    # Всегда "Общий"
+    buttons.append("🏠 Общий")
+
+    # Раскладка по 2 в ряд
+    rows: list[list[KeyboardButton]] = []
+    for i in range(0, len(buttons), 2):
+        row = [KeyboardButton(text=buttons[i])]
+        if i + 1 < len(buttons):
+            row.append(KeyboardButton(text=buttons[i + 1]))
+        rows.append(row)
+
+    return ReplyKeyboardMarkup(
+        keyboard=rows,
+        resize_keyboard=True,
+        is_persistent=True,
+    )

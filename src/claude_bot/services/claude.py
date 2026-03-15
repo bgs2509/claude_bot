@@ -238,22 +238,31 @@ async def run_claude(
     return ClaudeResponse(text=result_text, session_id=sid, files=collected_files)
 
 
-async def _send_html_or_plain(message: types.Message, text: str) -> None:
+async def _send_html_or_plain(
+    message: types.Message,
+    text: str,
+    reply_markup: types.ReplyKeyboardMarkup | None = None,
+) -> None:
     """Отправить сообщение как HTML, при ошибке — plain text."""
     formatted = markdown_to_telegram_html(text)
     try:
-        await message.answer(formatted, parse_mode="HTML")
+        await message.answer(formatted, parse_mode="HTML", reply_markup=reply_markup)
     except Exception:
-        await message.answer(text)
+        await message.answer(text, reply_markup=reply_markup)
 
 
-async def send_long(message: types.Message, text: str, max_len: int = 4000) -> None:
+async def send_long(
+    message: types.Message,
+    text: str,
+    max_len: int = 4000,
+    reply_markup: types.ReplyKeyboardMarkup | None = None,
+) -> None:
     """Отправка ответа. Если > max_len — первый чанк + .md файл."""
     if not text.strip():
         text = "(пустой ответ)"
 
     if len(text) <= max_len:
-        await _send_html_or_plain(message, text)
+        await _send_html_or_plain(message, text, reply_markup=reply_markup)
         return
 
     # Первый чанк + файл с полным ответом
@@ -264,5 +273,7 @@ async def send_long(message: types.Message, text: str, max_len: int = 4000) -> N
     with open(md_path, "w", encoding="utf-8") as f:
         f.write(text)
     doc = FSInputFile(md_path, filename="response.md")
-    await message.answer_document(doc, caption="Полный ответ в файле")
+    await message.answer_document(
+        doc, caption="Полный ответ в файле", reply_markup=reply_markup,
+    )
     os.unlink(md_path)

@@ -7,11 +7,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from aiogram import Bot, types
-from aiogram.types import FSInputFile
+from aiogram.types import FSInputFile, ReplyKeyboardMarkup
 
-from claude_bot.config import Settings
+from claude_bot.config import Settings, get_user_projects_dir
 from claude_bot.context import obs_output_var, obs_status_var
 from claude_bot.errors import get_user_message
+from claude_bot.keyboards import build_project_reply_keyboard
 from claude_bot.services.claude import ClaudeResponse, run_claude, send_long
 from claude_bot.services.speech import synthesize_speech
 from claude_bot.state import AppState
@@ -22,6 +23,22 @@ if TYPE_CHECKING:
 log = logging.getLogger("claude-bot.handlers")
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
+
+
+def _build_reply_kb(
+    storage: "SessionStorage | None",
+    settings: Settings,
+    uid: int,
+) -> ReplyKeyboardMarkup | None:
+    """Собрать reply-клавиатуру с проектами если доступен storage."""
+    if not storage:
+        return None
+    projects_dir = get_user_projects_dir(settings, uid)
+    projects = storage.list_projects(projects_dir)
+    if not projects:
+        return None
+    user = storage.get_user(uid)
+    return build_project_reply_keyboard(projects, user.active_project)
 
 
 async def download_file(bot: Bot, file_id: str, suffix: str) -> str:
@@ -87,7 +104,8 @@ async def call_claude_safe(
     """
     try:
         response = await run_claude(prompt, uid, settings, app_state, storage=storage)
-        await send_long(message, response.text, settings.max_message_len)
+        reply_markup = _build_reply_kb(storage, settings, uid)
+        await send_long(message, response.text, settings.max_message_len, reply_markup=reply_markup)
         if response.files:
             await send_files(message, response.files)
         obs_status_var.set("claude_success")

@@ -123,6 +123,12 @@ class SessionStorage:
         user.active_project = name
         await self._save()
 
+    async def clear_active_project(self, uid: int) -> None:
+        """Сбросить активный проект (работа в общей директории)."""
+        user = self.get_user(uid)
+        user.active_project = None
+        await self._save()
+
     async def set_active_project(self, uid: int, name: str, projects_dir: Path) -> bool:
         """Переключить активный проект. Возвращает False если папки нет."""
         project_path = projects_dir / name
@@ -134,6 +140,27 @@ class SessionStorage:
             user.projects[name] = ProjectData()
         await self._save()
         return True
+
+    async def restore_last_session(self, uid: int) -> str | None:
+        """Активировать последнюю использованную сессию текущего проекта.
+
+        Returns:
+            Имя восстановленной сессии или None если сессий нет.
+        """
+        pd = self._get_project_data(uid)
+        if pd.active_session:
+            for s in pd.sessions:
+                if s.id == pd.active_session:
+                    return s.name
+            return None
+
+        if not pd.sessions:
+            return None
+
+        last = max(pd.sessions, key=lambda s: s.last_used)
+        pd.active_session = last.id
+        await self._save()
+        return last.name
 
     # ── сессии ──
 

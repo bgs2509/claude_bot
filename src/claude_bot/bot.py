@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from aiogram import Bot, Dispatcher
 
 from claude_bot.config import Settings
-from claude_bot.handlers import commands, document, photo, text, upload, voice
+from claude_bot.handlers import commands, document, photo, project_switch, text, upload, voice
 from claude_bot.handlers.menu import router as menu_router
 from claude_bot.middlewares.auth import AuthMiddleware
 from claude_bot.middlewares.error import ErrorMiddleware
@@ -49,9 +49,10 @@ def create_dispatcher(
     dp.message.middleware(obs)
     dp.callback_query.middleware(obs)
 
-    # Роутеры (порядок важен: menu до text, text последним — ловит всё)
+    # Роутеры (порядок важен: project_switch перед text, text последним — ловит всё)
     dp.include_router(commands.router)
     dp.include_router(menu_router)
+    dp.include_router(project_switch.router)
     dp.include_router(upload.router)
     dp.include_router(voice.router)
     dp.include_router(photo.router)
