@@ -130,7 +130,8 @@ async def _handle_home(
     keyboard = build_project_reply_keyboard(
         storage.list_projects(projects_dir), None,
     )
-    await message.answer("🏠 Без проекта", reply_markup=keyboard)
+    await message.react([ReactionTypeEmoji(emoji="👌")])
+    await message.answer("🏠 Общий", reply_markup=keyboard)
 
 
 async def _handle_switch(
@@ -170,5 +171,6 @@ async def _handle_switch(
     )
     label = f"▶️ {project_name}"
     if session_name:
-        label += f" ({session_name})"
+        label += f" · {session_name}"
+    await message.react([ReactionTypeEmoji(emoji="👌")])
     await message.answer(label, reply_markup=keyboard)
