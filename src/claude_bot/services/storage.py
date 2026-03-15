@@ -261,3 +261,15 @@ class SessionStorage:
         """Все сессии активного проекта (по last_used)."""
         pd = self._get_project_data(uid)
         return sorted(pd.sessions, key=lambda s: s.last_used, reverse=True)
+
+    def get_project_sessions(self, uid: int, project_name: str) -> list[SessionInfo]:
+        """Все сессии указанного проекта (по last_used)."""
+        user = self.get_user(uid)
+        pd = user.projects.get(project_name, ProjectData())
+        return sorted(pd.sessions, key=lambda s: s.last_used, reverse=True)
+
+    def get_project_active_session_id(self, uid: int, project_name: str) -> str | None:
+        """ID активной сессии указанного проекта."""
+        user = self.get_user(uid)
+        pd = user.projects.get(project_name)
+        return pd.active_session if pd else None

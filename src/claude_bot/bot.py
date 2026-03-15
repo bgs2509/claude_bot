@@ -8,7 +8,6 @@ from aiogram import Bot, Dispatcher
 
 from claude_bot.config import Settings
 from claude_bot.handlers import commands, document, photo, project_switch, text, upload, voice
-from claude_bot.handlers.menu import router as menu_router
 from claude_bot.middlewares.auth import AuthMiddleware
 from claude_bot.middlewares.error import ErrorMiddleware
 from claude_bot.middlewares.observability import ObservabilityMiddleware
@@ -49,7 +48,6 @@ def create_dispatcher(
 
     # Роутеры (порядок важен: project_switch перед text, text последним — ловит всё)
     dp.include_router(commands.router)
-    dp.include_router(menu_router)
     dp.include_router(project_switch.router)
     dp.include_router(upload.router)
     dp.include_router(voice.router)

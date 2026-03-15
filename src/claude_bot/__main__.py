@@ -37,6 +37,21 @@ async def _run(settings: Settings) -> None:
     log.info("TTS голос: %s", settings.tts_voice)
 
     bot = create_bot(settings)
+
+    # Установить команды бота в меню Telegram
+    try:
+        from aiogram.types import BotCommand
+        await bot.set_my_commands([
+            BotCommand(command="status", description="Проекты, сессии, настройки"),
+            BotCommand(command="new", description="Новая сессия"),
+            BotCommand(command="model", description="Сменить модель"),
+            BotCommand(command="voice", description="Вкл/выкл голосовые ответы"),
+            BotCommand(command="help", description="Справка"),
+            BotCommand(command="cancel", description="Отменить запрос"),
+        ])
+    except Exception as e:
+        log.warning("Не удалось установить команды бота: %s", e)
+
     dp = create_dispatcher(settings, state, storage, event_logger=event_logger)
     try:
         await dp.start_polling(bot)

@@ -1,15 +1,23 @@
 """Обработчики команд бота."""
 
 import logging
+import re
 from datetime import date
 
-from aiogram import Router
-from aiogram.filters import CommandStart, Command, CommandObject
+from aiogram import F, Router
+from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.types import CallbackQuery, Message
 
-from claude_bot.config import Settings
+from claude_bot.config import Settings, get_user_projects_dir
+from claude_bot.constants import EMOJI_ACTIVE, EMOJI_HOME
 from claude_bot.handlers import _build_reply_kb
+from claude_bot.keyboards import (
+    build_paginated_keyboard,
+    build_sessions_keyboard,
+    build_status_keyboard,
+)
 from claude_bot.services.claude import MODELS, get_project_dir
 from claude_bot.services.storage import SessionStorage
 from claude_bot.state import AppState
@@ -17,6 +25,54 @@ from claude_bot.state import AppState
 router = Router(name="commands")
 log = logging.getLogger("claude-bot.commands")
 
+
+# ── FSM для создания проекта ──
+
+class CreateProject(StatesGroup):
+    waiting_name = State()
+
+
+# ── Хелперы ──
+
+def _status_text(
+    storage: SessionStorage | None,
+    uid: int,
+    app_state: AppState,
+    settings: Settings,
+) -> str:
+    """Текст статуса: проект · сессия, модель · голос."""
+    # Проект и сессия
+    if storage:
+        user = storage.get_user(uid)
+        project_name = user.active_project
+        session_name = storage.get_active_session_name(uid)
+    else:
+        project_name = None
+        session_name = None
+
+    if project_name:
+        line1 = f"{EMOJI_ACTIVE} {project_name}"
+        if session_name:
+            line1 += f" · {session_name}"
+    else:
+        line1 = f"{EMOJI_HOME} Общий"
+
+    # Модель и голос
+    user_cfg = settings.users.get(str(uid))
+    config_model = user_cfg.get("model") if user_cfg else None
+    user_role = user_cfg.get("role", "readonly") if user_cfg else "readonly"
+    if user_role == "user" and config_model:
+        model = config_model
+    elif config_model:
+        model = app_state.user_models.get(uid, config_model)
+    else:
+        model = app_state.user_models.get(uid, "sonnet")
+    voice = "вкл" if app_state.user_voice_mode.get(uid, False) else "выкл"
+
+    return f"{line1}\nМодель: {model} · Голос: {voice}"
+
+
+# ── /start ──
 
 @router.message(CommandStart())
 async def cmd_start(
@@ -30,11 +86,13 @@ async def cmd_start(
         "Что умею:\n"
         "• Текст, голос, фото, файлы → Claude ответит\n"
         "• Работаю с кодом, файловой системой, bash\n"
-        "• Проекты и сессии — /menu\n\n"
+        "• Проекты и сессии — /status\n\n"
         "/help — полная справка и все команды",
         reply_markup=reply_kb,
     )
 
+
+# ── /help ──
 
 @router.message(Command("help"))
 async def cmd_help(message: Message) -> None:
@@ -49,12 +107,11 @@ async def cmd_help(message: Message) -> None:
         "• Файл — сохраняется в проект, анализируется Claude\n\n"
 
         "<b>Команды бота:</b>\n"
-        "/menu — проекты и сессии\n"
+        "/status — проекты, сессии, настройки\n"
         "/new — новая сессия (сбросить контекст)\n"
         "/cancel — отменить текущий запрос\n"
         "/model — сменить модель (haiku / sonnet / opus)\n"
         "/voice — вкл/выкл голосовые ответы\n"
-        "/status — текущее состояние\n"
         "/usage — твоя статистика за сегодня\n"
         "/stats — статистика всех (admin)\n\n"
 
@@ -77,24 +134,35 @@ async def cmd_help(message: Message) -> None:
     )
 
 
+# ── /new ──
+
 @router.message(Command("new"))
 async def cmd_new(
     message: Message, app_state: AppState, storage: SessionStorage | None = None,
 ) -> None:
     uid = message.from_user.id
     log.info("Команда /new — сброс сессии")
+
+    session_name = storage.get_active_session_name(uid) if storage else None
     app_state.user_sessions.pop(uid, None)
     if storage:
         await storage.create_new_session(uid)
-    await message.answer("Сессия сброшена. Следующее сообщение начнёт новую.")
 
+    if session_name:
+        await message.answer(
+            f"Сессия «{session_name}» сброшена. Следующее сообщение начнёт новую.",
+        )
+    else:
+        await message.answer("Сессия сброшена. Следующее сообщение начнёт новую.")
+
+
+# ── /cancel ──
 
 @router.message(Command("cancel"))
 async def cmd_cancel(
     message: Message, app_state: AppState, state: FSMContext,
 ) -> None:
     uid = message.from_user.id
-    # Сбросить FSM-состояние если активно
     current_state = await state.get_state()
     if current_state:
         await state.clear()
@@ -110,6 +178,8 @@ async def cmd_cancel(
         log.info("Команда /cancel — нет процесса")
         await message.answer("Нет активного запроса.")
 
+
+# ── /model ──
 
 @router.message(Command("model"))
 async def cmd_model(message: Message, command: CommandObject, app_state: AppState, role: str) -> None:
@@ -136,6 +206,8 @@ async def cmd_model(message: Message, command: CommandObject, app_state: AppStat
     await message.answer(f"Модель: {name}")
 
 
+# ── /voice ──
+
 @router.message(Command("voice"))
 async def cmd_voice(message: Message, app_state: AppState) -> None:
     uid = message.from_user.id
@@ -146,6 +218,8 @@ async def cmd_voice(message: Message, app_state: AppState) -> None:
     await message.answer(f"Голосовой режим {status}")
 
 
+# ── /status ──
+
 @router.message(Command("status"))
 async def cmd_status(
     message: Message,
@@ -155,34 +229,266 @@ async def cmd_status(
 ) -> None:
     log.info("Команда /status")
     uid = message.from_user.id
-    # Определить актуальную модель с учётом конфига
-    user_cfg = settings.users.get(str(uid))
-    user_role = user_cfg.get("role", "readonly") if user_cfg else "readonly"
-    config_model = user_cfg.get("model") if user_cfg else None
-    if user_role == "user" and config_model:
-        model = config_model
-    elif config_model:
-        model = app_state.user_models.get(uid, config_model)
-    else:
-        model = app_state.user_models.get(uid, "sonnet")
-    voice = "вкл" if app_state.user_voice_mode.get(uid, False) else "выкл"
-    cwd = str(get_project_dir(settings, storage, uid))
+    text = _status_text(storage, uid, app_state, settings)
 
-    project_name = "—"
-    session_name = "—"
     if storage:
+        projects_dir = get_user_projects_dir(settings, uid)
+        projects = storage.list_projects(projects_dir)
         user = storage.get_user(uid)
-        project_name = user.active_project or "—"
-        session_name = storage.get_active_session_name(uid) or "—"
 
-    await message.answer(
-        f"Проект: {project_name}\n"
-        f"Сессия: {session_name}\n"
-        f"Модель: {model}\n"
-        f"Голос: {voice}\n"
-        f"Директория: {cwd}"
+        if not projects:
+            text += "\n\nОтправь сообщение — бот работает в общей директории.\nИли создай проект:"
+
+        markup = build_status_keyboard(projects, user.active_project)
+        await message.answer(text, reply_markup=markup)
+    else:
+        await message.answer(text)
+
+
+# ── /status callback: главный экран ──
+
+@router.callback_query(F.data == "st:main")
+async def cb_status_main(
+    callback: CallbackQuery,
+    app_state: AppState,
+    settings: Settings,
+    storage: SessionStorage,
+) -> None:
+    uid = callback.from_user.id
+    text = _status_text(storage, uid, app_state, settings)
+    projects_dir = get_user_projects_dir(settings, uid)
+    projects = storage.list_projects(projects_dir)
+    user = storage.get_user(uid)
+
+    if not projects:
+        text += "\n\nОтправь сообщение — бот работает в общей директории.\nИли создай проект:"
+
+    markup = build_status_keyboard(projects, user.active_project)
+    await callback.message.edit_text(text, reply_markup=markup)
+    await callback.answer()
+
+
+# ── /status callback: выбор проекта → показать сессии ──
+
+@router.callback_query(F.data.startswith("st:proj:"))
+async def cb_status_project(
+    callback: CallbackQuery,
+    settings: Settings,
+    storage: SessionStorage,
+) -> None:
+    uid = callback.from_user.id
+    project_name = callback.data[8:]  # после "st:proj:"
+    sessions = storage.get_project_sessions(uid, project_name)
+    active_sid = storage.get_project_active_session_id(uid, project_name)
+
+    items = [(s.name, s.id) for s in sessions]
+    text = f"{EMOJI_INACTIVE} {project_name}" if sessions else f"{EMOJI_INACTIVE} {project_name}\n\nСессий пока нет."
+    markup = build_sessions_keyboard(items, active_sid)
+    await callback.message.edit_text(text, reply_markup=markup)
+    await callback.answer()
+
+
+# ── /status callback: выбор сессии ──
+
+@router.callback_query(F.data.startswith("st:ssel:"))
+async def cb_status_select_session(
+    callback: CallbackQuery,
+    app_state: AppState,
+    settings: Settings,
+    storage: SessionStorage,
+) -> None:
+    uid = callback.from_user.id
+    sid = callback.data[8:]  # после "st:ssel:"
+    ok = await storage.set_active_session(uid, sid)
+    if not ok:
+        await callback.answer("Сессия не найдена", show_alert=True)
+        return
+    log.info("Status: сессия выбрана %s", sid[:8])
+
+    # Вернуться на главный экран статуса
+    text = _status_text(storage, uid, app_state, settings)
+    projects_dir = get_user_projects_dir(settings, uid)
+    projects = storage.list_projects(projects_dir)
+    user = storage.get_user(uid)
+    markup = build_status_keyboard(projects, user.active_project)
+    await callback.message.edit_text(text, reply_markup=markup)
+    await callback.answer("Сессия переключена")
+
+
+# ── /status callback: пагинация сессий ──
+
+@router.callback_query(F.data.startswith("st:sess:"))
+async def cb_status_sessions_page(
+    callback: CallbackQuery,
+    settings: Settings,
+    storage: SessionStorage,
+) -> None:
+    uid = callback.from_user.id
+    page = int(callback.data.split(":")[2])
+    user = storage.get_user(uid)
+    project_name = user.active_project or "__global__"
+    sessions = storage.get_project_sessions(uid, project_name)
+    active_sid = storage.get_project_active_session_id(uid, project_name)
+
+    items = [(s.name, s.id) for s in sessions]
+    text = f"{EMOJI_INACTIVE} {project_name}"
+    markup = build_sessions_keyboard(items, active_sid, page=page)
+    await callback.message.edit_text(text, reply_markup=markup)
+    await callback.answer()
+
+
+# ── /status callback: новая сессия ──
+
+@router.callback_query(F.data == "st:newsess")
+async def cb_status_new_session(
+    callback: CallbackQuery,
+    app_state: AppState,
+    settings: Settings,
+    storage: SessionStorage,
+) -> None:
+    uid = callback.from_user.id
+    await storage.create_new_session(uid)
+    app_state.user_sessions.pop(uid, None)
+    log.info("Status: новая сессия")
+
+    text = _status_text(storage, uid, app_state, settings)
+    projects_dir = get_user_projects_dir(settings, uid)
+    projects = storage.list_projects(projects_dir)
+    user = storage.get_user(uid)
+    markup = build_status_keyboard(projects, user.active_project)
+    await callback.message.edit_text(text, reply_markup=markup)
+    await callback.answer("Новая сессия создана")
+
+
+# ── /status callback: домой (сбросить проект) ──
+
+@router.callback_query(F.data == "st:home")
+async def cb_status_home(
+    callback: CallbackQuery,
+    app_state: AppState,
+    settings: Settings,
+    storage: SessionStorage,
+) -> None:
+    uid = callback.from_user.id
+    await storage.clear_active_project(uid)
+    log.info("Status: сброс проекта")
+
+    text = _status_text(storage, uid, app_state, settings)
+    projects_dir = get_user_projects_dir(settings, uid)
+    projects = storage.list_projects(projects_dir)
+    markup = build_status_keyboard(projects, None)
+    await callback.message.edit_text(text, reply_markup=markup)
+    await callback.answer()
+
+
+# ── /status callback: создать проект (FSM) ──
+
+@router.callback_query(F.data == "st:newproj")
+async def cb_status_new_project(
+    callback: CallbackQuery, state: FSMContext,
+) -> None:
+    await callback.message.edit_text(
+        "Введи название проекта (a-z, 0-9, -, _, макс 32):",
     )
+    await state.set_state(CreateProject.waiting_name)
+    await callback.answer()
 
+
+# ── /status callback: пагинация проектов ──
+
+@router.callback_query(F.data.startswith("p:list:"))
+async def cb_project_list(
+    callback: CallbackQuery, storage: SessionStorage, settings: Settings,
+) -> None:
+    uid = callback.from_user.id
+    page = int(callback.data.split(":")[2])
+    projects_dir = get_user_projects_dir(settings, uid)
+    projects = storage.list_projects(projects_dir)
+    active = storage.get_user(uid).active_project
+
+    items = []
+    for name in projects:
+        emoji = EMOJI_ACTIVE if name == active else EMOJI_INACTIVE
+        items.append((f"{emoji} {name}", f"p:sel:{name[:50]}"))
+
+    markup = build_paginated_keyboard(
+        items=items, page=page,
+        new_callback="st:newproj",
+        back_callback="st:main",
+        more_prefix="p:list:",
+    )
+    await callback.message.edit_text("Проекты:", reply_markup=markup)
+    await callback.answer()
+
+
+# ── /status callback: выбор проекта из пагинации ──
+
+@router.callback_query(F.data.startswith("p:sel:"))
+async def cb_select_project(
+    callback: CallbackQuery,
+    app_state: AppState,
+    settings: Settings,
+    storage: SessionStorage,
+) -> None:
+    uid = callback.from_user.id
+    name = callback.data[6:]  # после "p:sel:"
+    projects_dir = get_user_projects_dir(settings, uid)
+    ok = await storage.set_active_project(uid, name, projects_dir)
+    if not ok:
+        await callback.answer(f"Проект '{name}' не найден", show_alert=True)
+        return
+    log.info("Status: проект выбран %s", name)
+
+    # Показать сессии выбранного проекта
+    sessions = storage.get_project_sessions(uid, name)
+    active_sid = storage.get_project_active_session_id(uid, name)
+    items = [(s.name, s.id) for s in sessions]
+    text = f"{EMOJI_INACTIVE} {name}" if sessions else f"{EMOJI_INACTIVE} {name}\n\nСессий пока нет."
+    markup = build_sessions_keyboard(items, active_sid)
+    await callback.message.edit_text(text, reply_markup=markup)
+    await callback.answer(f"Проект: {name}")
+
+
+# ── FSM: ввод имени проекта ──
+
+@router.message(CreateProject.waiting_name)
+async def process_project_name(
+    message: Message, state: FSMContext, storage: SessionStorage, settings: Settings,
+    app_state: AppState,
+) -> None:
+    name = message.text.strip() if message.text else ""
+    if not re.match(r"^[a-zA-Z0-9_-]{1,32}$", name):
+        await message.answer(
+            "Недопустимое имя. Используй a-z, 0-9, -, _ (макс 32 символа).",
+        )
+        return
+
+    uid = message.from_user.id
+    projects_dir = get_user_projects_dir(settings, uid)
+    await storage.create_project(uid, name, projects_dir)
+    log.info("Status: проект создан %s", name)
+    await state.clear()
+
+    reply_kb = _build_reply_kb(storage, settings, uid)
+    text = _status_text(storage, uid, app_state, settings)
+    projects = storage.list_projects(projects_dir)
+    user = storage.get_user(uid)
+    markup = build_status_keyboard(projects, user.active_project)
+    await message.answer(
+        f"Проект '{name}' создан.\n\n{text}",
+        reply_markup=reply_kb,
+    )
+    await message.answer("Проекты:", reply_markup=markup)
+
+
+# ── /status callback: заглушка ──
+
+@router.callback_query(F.data == "noop")
+async def cb_noop(callback: CallbackQuery) -> None:
+    await callback.answer()
+
+
+# ── /usage ──
 
 @router.message(Command("usage"))
 async def cmd_usage(message: Message, settings: Settings, app_state: AppState) -> None:
@@ -198,6 +504,8 @@ async def cmd_usage(message: Message, settings: Settings, app_state: AppState) -
 
     await message.answer(f"Сегодня: {today_count} сообщений")
 
+
+# ── /stats ──
 
 @router.message(Command("stats"))
 async def cmd_stats(message: Message, settings: Settings, app_state: AppState, role: str) -> None:

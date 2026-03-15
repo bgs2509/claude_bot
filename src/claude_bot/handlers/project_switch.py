@@ -6,20 +6,23 @@ from pathlib import Path
 
 from aiogram import Router
 from aiogram.filters import BaseFilter
+from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, ReactionTypeEmoji
 
 from claude_bot.config import Settings, get_user_projects_dir
+from claude_bot.constants import (
+    BUTTON_CREATE_PROJECT,
+    BUTTON_HOME,
+    BUTTON_MORE,
+    EMOJI_ACTIVE,
+    EMOJI_INACTIVE,
+    EMOJI_REACTION,
+)
 from claude_bot.keyboards import build_paginated_keyboard, build_project_reply_keyboard
 from claude_bot.services.storage import SessionStorage
 
 router = Router(name="project_switch")
 log = logging.getLogger("claude-bot.project_switch")
-
-# Служебные кнопки
-_BUTTON_MORE = "📋 Ещё"
-_BUTTON_HOME = "🏠 Общий"
-_PREFIX_ACTIVE = "▶️ "
-_PREFIX_INACTIVE = "📁 "
 
 
 def _parse_project_button(text: str) -> tuple[str | None, str | None]:
@@ -27,16 +30,18 @@ def _parse_project_button(text: str) -> tuple[str | None, str | None]:
 
     Returns:
         (button_type, project_name): тип кнопки и имя проекта.
-        button_type: "active", "inactive", "more", "home" или None.
+        button_type: "active", "inactive", "more", "home", "create" или None.
     """
-    if text == _BUTTON_MORE:
+    if text == BUTTON_MORE:
         return "more", None
-    if text == _BUTTON_HOME:
+    if text == BUTTON_HOME:
         return "home", None
-    if text.startswith(_PREFIX_ACTIVE):
-        return "active", text[len(_PREFIX_ACTIVE):]
-    if text.startswith(_PREFIX_INACTIVE):
-        return "inactive", text[len(_PREFIX_INACTIVE):]
+    if text == BUTTON_CREATE_PROJECT:
+        return "create", None
+    if text.startswith(f"{EMOJI_ACTIVE} "):
+        return "active", text[len(f"{EMOJI_ACTIVE} "):]
+    if text.startswith(f"{EMOJI_INACTIVE} "):
+        return "inactive", text[len(f"{EMOJI_INACTIVE} "):]
     return None, None
 
 
@@ -74,6 +79,7 @@ async def handle_project_button(
     storage: SessionStorage,
     button_type: str,
     project_name: str | None,
+    state: FSMContext,
 ) -> None:
     """Обработать нажатие reply-кнопки проекта."""
     uid = message.from_user.id
@@ -85,6 +91,10 @@ async def handle_project_button(
 
     if button_type == "home":
         await _handle_home(message, storage, settings, uid, projects_dir)
+        return
+
+    if button_type == "create":
+        await _handle_create(message, state)
         return
 
     # active или inactive — переключить проект
@@ -101,7 +111,7 @@ async def _handle_more(
     items = [(p, f"p:sel:{p[:50]}") for p in projects]
     markup = build_paginated_keyboard(
         items=items, page=0,
-        new_callback="p:new", back_callback="m:main",
+        new_callback="st:newproj", back_callback="st:main",
         more_prefix="p:list:",
     )
     await message.answer("Все проекты:", reply_markup=markup)
@@ -117,7 +127,7 @@ async def _handle_home(
     """Сбросить активный проект."""
     user = storage.get_user(uid)
     if user.active_project is None:
-        await message.react([ReactionTypeEmoji(emoji="👌")])
+        await message.react([ReactionTypeEmoji(emoji=EMOJI_REACTION)])
         return
 
     old_project = user.active_project
@@ -130,8 +140,15 @@ async def _handle_home(
     keyboard = build_project_reply_keyboard(
         storage.list_projects(projects_dir), None,
     )
-    await message.react([ReactionTypeEmoji(emoji="👌")])
-    await message.answer("🏠 Общий", reply_markup=keyboard)
+    await message.react([ReactionTypeEmoji(emoji=EMOJI_REACTION)])
+    await message.answer(f"{EMOJI_HOME} Общий", reply_markup=keyboard)
+
+
+async def _handle_create(message: Message, state: FSMContext) -> None:
+    """Начать FSM создания проекта."""
+    from claude_bot.handlers.commands import CreateProject
+    await state.set_state(CreateProject.waiting_name)
+    await message.answer("Введи название проекта (a-z, 0-9, -, _, макс 32):")
 
 
 async def _handle_switch(
@@ -147,7 +164,7 @@ async def _handle_switch(
 
     # Нажали текущий проект — реакция «уже активен»
     if user.active_project == project_name:
-        await message.react([ReactionTypeEmoji(emoji="👌")])
+        await message.react([ReactionTypeEmoji(emoji=EMOJI_REACTION)])
         return
 
     old_project = user.active_project
@@ -169,8 +186,8 @@ async def _handle_switch(
     keyboard = build_project_reply_keyboard(
         storage.list_projects(projects_dir), project_name,
     )
-    label = f"▶️ {project_name}"
+    label = f"{EMOJI_ACTIVE} {project_name}"
     if session_name:
         label += f" · {session_name}"
-    await message.react([ReactionTypeEmoji(emoji="👌")])
+    await message.react([ReactionTypeEmoji(emoji=EMOJI_REACTION)])
     await message.answer(label, reply_markup=keyboard)
