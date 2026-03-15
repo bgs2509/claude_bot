@@ -34,20 +34,18 @@ def create_dispatcher(
     """Создать диспетчер с зарегистрированными роутерами и middleware."""
     dp = Dispatcher()
 
-    # ErrorMiddleware первым — ловит все необработанные исключения
+    # Outer middleware — запускается ДО фильтров (порядок: error → auth → obs)
     error_mw = ErrorMiddleware()
-    dp.message.middleware(error_mw)
-    dp.callback_query.middleware(error_mw)
+    dp.message.outer_middleware(error_mw)
+    dp.callback_query.outer_middleware(error_mw)
 
-    # AuthMiddleware вторым — авторизация и контекст
     auth = AuthMiddleware(settings, state, storage)
-    dp.message.middleware(auth)
-    dp.callback_query.middleware(auth)
+    dp.message.outer_middleware(auth)
+    dp.callback_query.outer_middleware(auth)
 
-    # ObservabilityMiddleware третьим — трейсинг после авторизации
     obs = ObservabilityMiddleware(event_logger)
-    dp.message.middleware(obs)
-    dp.callback_query.middleware(obs)
+    dp.message.outer_middleware(obs)
+    dp.callback_query.outer_middleware(obs)
 
     # Роутеры (порядок важен: project_switch перед text, text последним — ловит всё)
     dp.include_router(commands.router)
