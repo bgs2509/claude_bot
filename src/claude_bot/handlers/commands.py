@@ -11,7 +11,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
 from claude_bot.config import Settings, get_user_projects_dir
-from claude_bot.constants import EMOJI_ACTIVE, EMOJI_HOME
+from claude_bot.constants import EMOJI_ACTIVE, EMOJI_HOME, EMOJI_INACTIVE
 from claude_bot.handlers import _build_reply_kb
 from claude_bot.keyboards import (
     build_paginated_keyboard,
