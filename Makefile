@@ -1,4 +1,4 @@
-.PHONY: run install clean help vps
+.PHONY: run install clean help vps logs-vps
 
 help:  ## Показать справку
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -15,6 +15,9 @@ vps:  ## Установить и перезапустить systemd-сервис
 	sudo systemctl daemon-reload
 	sudo systemctl enable claude-bot
 	sudo systemctl restart claude-bot
+
+logs-vps:  ## Логи systemd-сервиса (follow)
+	sudo journalctl -u claude-bot -f
 
 clean:  ## Удалить кэш и .venv
 	rm -rf .venv
