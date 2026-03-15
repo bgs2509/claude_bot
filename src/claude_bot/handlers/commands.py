@@ -278,6 +278,12 @@ async def cb_status_project(
 ) -> None:
     uid = callback.from_user.id
     project_name = callback.data[8:]  # после "st:proj:"
+    projects_dir = get_user_projects_dir(settings, uid)
+    ok = await storage.set_active_project(uid, project_name, projects_dir)
+    if not ok:
+        await callback.answer(f"Проект '{project_name}' не найден", show_alert=True)
+        return
+    log.info("Status: проект выбран %s", project_name)
     sessions = storage.get_project_sessions(uid, project_name)
     active_sid = storage.get_project_active_session_id(uid, project_name)
 
