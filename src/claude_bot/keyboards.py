@@ -15,6 +15,7 @@ from claude_bot.constants import (
     EMOJI_CREATE,
     EMOJI_HOME,
     EMOJI_INACTIVE,
+    EMOJI_MORE,
     EMOJI_SESSION,
 )
 

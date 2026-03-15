@@ -15,6 +15,7 @@ from claude_bot.constants import (
     BUTTON_HOME,
     BUTTON_MORE,
     EMOJI_ACTIVE,
+    EMOJI_HOME,
     EMOJI_INACTIVE,
     EMOJI_REACTION,
 )
