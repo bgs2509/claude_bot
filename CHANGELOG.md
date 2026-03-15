@@ -21,6 +21,11 @@
 - Бинарные файлы: Claude получает путь к файлу
 - Текстовые файлы: содержимое передаётся в промпт + файл сохраняется
 - Настройка `MAX_UPLOAD_SIZE` (по умолчанию 20MB)
+- Reply-клавиатура для быстрого переключения проекта (кнопки с названиями проектов)
+- Reply-клавиатура привязана к `/start`
+- Иерархия исключений: `AppError` → `DomainError`, `InfrastructureError` с каталогом user-friendly сообщений (`errors.py`)
+- Публичный метод `storage.get_active_session_name()` (Law of Demeter)
+- Make-target `logs-vps` для просмотра логов systemd-сервиса
 
 ### Changed
 
@@ -36,6 +41,15 @@
 - Модель юзера с ролью `user` фиксируется из конфига и не может быть изменена
 - Дневной лимит сообщений заменён на поминутный rate-limit
 - `/usage` показывает только счётчик без лимита
+- Google-style docstrings в публичных функциях и классах
+- Structured logging: именованные параметры (uid, username, reason) в auth, storage, __main__
+- SRP: `send_long()` перенесён из `services/claude.py` в `handlers/__init__.py`
+- `ErrorMiddleware` различает `DomainError` (warning) и `AppError` (error, со stack trace)
+- systemd-сервис обновлён для текущего окружения
+
+### Fixed
+
+- Reply-клавиатура не отображалась при отсутствии проектов у пользователя
 
 ## [2.0.0] - 2026-03-06
 

@@ -25,6 +25,7 @@
 | [007](007-pydantic-settings.md) | pydantic-settings для конфигурации | Принято | 2026-03-06 |
 | [008](008-uv.md) | uv как пакетный менеджер | Принято | 2026-03-06 |
 | [009](009-observability.md) | Observability-стек (JSON-логи + SQLite + Sentry) | Принято | 2026-03-09 |
+| [010](010-exception-hierarchy.md) | Иерархия исключений с каталогом user-friendly сообщений | Принято | 2026-03-15 |
 
 ## Шаблон нового ADR
 
