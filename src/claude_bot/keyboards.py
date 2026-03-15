@@ -113,7 +113,7 @@ def build_project_reply_keyboard(
 
     # Текущий проект первым с маркером
     if active_project and active_project in projects:
-        buttons.append(f"📂 {active_project}")
+        buttons.append(f"▶️ {active_project}")
         remaining = [p for p in projects if p != active_project]
     else:
         remaining = list(projects)

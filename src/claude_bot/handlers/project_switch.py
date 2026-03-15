@@ -6,7 +6,7 @@ from pathlib import Path
 
 from aiogram import Router
 from aiogram.filters import BaseFilter
-from aiogram.types import Message
+from aiogram.types import Message, ReactionTypeEmoji
 
 from claude_bot.config import Settings, get_user_projects_dir
 from claude_bot.keyboards import build_paginated_keyboard, build_project_reply_keyboard
@@ -18,7 +18,7 @@ log = logging.getLogger("claude-bot.project_switch")
 # Служебные кнопки
 _BUTTON_MORE = "📋 Ещё"
 _BUTTON_HOME = "🏠 Общий"
-_PREFIX_ACTIVE = "📂 "
+_PREFIX_ACTIVE = "▶️ "
 _PREFIX_INACTIVE = "📁 "
 
 
@@ -117,6 +117,7 @@ async def _handle_home(
     """Сбросить активный проект."""
     user = storage.get_user(uid)
     if user.active_project is None:
+        await message.react([ReactionTypeEmoji(emoji="👌")])
         return
 
     old_project = user.active_project
@@ -143,8 +144,9 @@ async def _handle_switch(
     """Переключить на указанный проект."""
     user = storage.get_user(uid)
 
-    # Нажали текущий проект — игнорировать
+    # Нажали текущий проект — реакция «уже активен»
     if user.active_project == project_name:
+        await message.react([ReactionTypeEmoji(emoji="👌")])
         return
 
     old_project = user.active_project
@@ -166,7 +168,7 @@ async def _handle_switch(
     keyboard = build_project_reply_keyboard(
         storage.list_projects(projects_dir), project_name,
     )
-    label = f"📂 {project_name}"
+    label = f"▶️ {project_name}"
     if session_name:
         label += f" ({session_name})"
     await message.answer(label, reply_markup=keyboard)
