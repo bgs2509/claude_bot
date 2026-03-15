@@ -9,6 +9,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
 from claude_bot.config import Settings
+from claude_bot.handlers import _build_reply_kb
 from claude_bot.services.claude import MODELS, get_project_dir
 from claude_bot.services.storage import SessionStorage
 from claude_bot.state import AppState
@@ -18,15 +19,20 @@ log = logging.getLogger("claude-bot.commands")
 
 
 @router.message(CommandStart())
-async def cmd_start(message: Message) -> None:
+async def cmd_start(
+    message: Message, settings: Settings, storage: SessionStorage | None = None,
+) -> None:
     log.info("Команда /start")
+    uid = message.from_user.id
+    reply_kb = _build_reply_kb(storage, settings, uid)
     await message.answer(
         "Claude Code Bot\n\n"
         "Что умею:\n"
         "• Текст, голос, фото, файлы → Claude ответит\n"
         "• Работаю с кодом, файловой системой, bash\n"
         "• Проекты и сессии — /menu\n\n"
-        "/help — полная справка и все команды"
+        "/help — полная справка и все команды",
+        reply_markup=reply_kb,
     )
 
 
