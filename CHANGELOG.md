@@ -26,6 +26,9 @@
 - Иерархия исключений: `AppError` → `DomainError`, `InfrastructureError` с каталогом user-friendly сообщений (`errors.py`)
 - Публичный метод `storage.get_active_session_name()` (Law of Demeter)
 - Make-target `logs-vps` для просмотра логов systemd-сервиса
+- Интерактивная команда `/status` с inline-навигацией (проекты → сессии → действия)
+- Реакция 👌 на нажатие reply-кнопок переключения проекта
+- Меню команд бота в Telegram (отображается при вводе `/`)
 
 ### Changed
 
@@ -46,10 +49,14 @@
 - SRP: `send_long()` перенесён из `services/claude.py` в `handlers/__init__.py`
 - `ErrorMiddleware` различает `DomainError` (warning) и `AppError` (error, со stack trace)
 - systemd-сервис обновлён для текущего окружения
+- `/menu` заменено на `/status` — единый интерактивный экран управления
+- Кнопка «🏠 Общий» в inline-меню показывает сессии общего пространства (единообразно с проектами)
+- Унифицированы эмодзи и тексты между reply-клавиатурой и inline-меню (SSOT в `constants.py`)
 
 ### Fixed
 
 - Reply-клавиатура не отображалась при отсутствии проектов у пользователя
+- Middleware регистрируются как outer (до фильтров), исправлен доступ к `settings` в фильтрах
 
 ## [2.0.0] - 2026-03-06
 

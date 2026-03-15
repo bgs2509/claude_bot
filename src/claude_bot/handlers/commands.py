@@ -379,10 +379,14 @@ async def cb_status_home(
     await storage.clear_active_project(uid)
     log.info("Status: сброс проекта")
 
-    text = _status_text(storage, uid, app_state, settings)
-    projects_dir = get_user_projects_dir(settings, uid)
-    projects = storage.list_projects(projects_dir)
-    markup = build_status_keyboard(projects, None)
+    # Показать сессии __global__ (единообразно с проектами)
+    sessions = storage.get_project_sessions(uid, "__global__")
+    active_sid = storage.get_project_active_session_id(uid, "__global__")
+    items = [(s.name, s.id) for s in sessions]
+    text = f"{EMOJI_HOME} Общий"
+    if not sessions:
+        text += "\n\nСессий пока нет."
+    markup = build_sessions_keyboard(items, active_sid)
     await callback.message.edit_text(text, reply_markup=markup)
     await callback.answer()
 
