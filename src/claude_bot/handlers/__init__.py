@@ -35,8 +35,6 @@ def _build_reply_kb(
         return None
     projects_dir = get_user_projects_dir(settings, uid)
     projects = storage.list_projects(projects_dir)
-    if not projects:
-        return None
     user = storage.get_user(uid)
     return build_project_reply_keyboard(projects, user.active_project)
 
