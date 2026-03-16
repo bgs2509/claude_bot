@@ -10,8 +10,9 @@ from typing import Literal
 from pydantic import BaseModel, Field, field_validator
 
 WeekDay = Literal["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
-Category = Literal["medication", "event", "todo", "reminder"]
-NotificationStatus = Literal["active", "paused", "completed"]
+# category и status — str, чтобы не ломаться на неизвестных значениях из notify.json
+# Известные категории: medication, event, todo, reminder
+# Известные статусы: active, paused, completed, pending
 
 
 class RepeatRule(BaseModel):
@@ -36,12 +37,12 @@ class Notification(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     title: str
     description: str = ""
-    category: Category = "reminder"
+    category: str = "reminder"
     datetime: datetime
     remind_before: list[int] = Field(default_factory=lambda: [0])
     repeat: RepeatRule | None = None
     recipients: list[int]
-    status: NotificationStatus = "active"
+    status: str = "active"
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
     )

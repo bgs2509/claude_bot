@@ -86,10 +86,14 @@ def remove(project_path: Path, notification_id: str) -> bool:
     return True
 
 
+# Статусы, при которых уведомление НЕ отправляется
+_INACTIVE_STATUSES = {"completed", "paused"}
+
+
 def get_active(project_path: Path) -> list[Notification]:
-    """Все активные уведомления проекта."""
+    """Все активные уведомления проекта (всё кроме completed/paused)."""
     data = load(project_path)
-    return [n for n in data.notifications if n.status == "active"]
+    return [n for n in data.notifications if n.status not in _INACTIVE_STATUSES]
 
 
 def _parse_time(time_str: str) -> tuple[int, int]:
@@ -128,7 +132,7 @@ def is_due(notification: Notification, now: datetime) -> list[int]:
         Список значений remind_before (минут), которые сейчас нужно отправить.
         Пустой список — ничего не отправлять.
     """
-    if notification.status != "active":
+    if notification.status in _INACTIVE_STATUSES:
         return []
 
     due_reminders: list[int] = []
