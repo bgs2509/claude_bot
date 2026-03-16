@@ -5,7 +5,7 @@
 
 ## Executive Summary
 
-Кодовая база приведена в соответствие со стандартами python-ai-guide: добавлена иерархия исключений с каталогом user-friendly сообщений, внедрён structured logging, применены принципы SRP и Law of Demeter, добавлены Google-style docstrings. Параллельно реализована reply-клавиатура для быстрого переключения проектов.
+Кодовая база приведена в соответствие со стандартами python-ai-skills: добавлена иерархия исключений с каталогом user-friendly сообщений, внедрён structured logging, применены принципы SRP и Law of Demeter, добавлены Google-style docstrings. Параллельно реализована reply-клавиатура для быстрого переключения проектов.
 
 ## Изменения
 
@@ -32,7 +32,7 @@
 ## Результаты ревью
 
 - **Quality Cascade**: exceptions → LoD → SRP → structured logging → docstrings
-- Каждый принцип python-ai-guide применён поэтапно с проверкой работоспособности
+- Каждый принцип python-ai-skills применён поэтапно с проверкой работоспособности
 
 ## Результаты тестов
 

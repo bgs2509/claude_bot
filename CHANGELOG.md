@@ -7,6 +7,11 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Архитектурный документ skills обновлён: добавлена структура python-ai-skills, symlink-деплой, cross-project workflow
+- Переименование python-ai-guide → python-ai-skills во всей документации
+
 ### Added
 
 - JSON-логи с ротацией в `data/bot.log` (5x10MB)
