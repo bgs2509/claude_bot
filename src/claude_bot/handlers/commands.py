@@ -1,5 +1,6 @@
 """Обработчики команд бота."""
 
+import html as html_lib
 import logging
 import re
 from datetime import date
@@ -11,13 +12,24 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
 from claude_bot.config import Settings, get_user_projects_dir
-from claude_bot.constants import EMOJI_ACTIVE, EMOJI_HOME, EMOJI_INACTIVE
+from claude_bot.constants import (
+    CATEGORY_EMOJI,
+    DAY_NAMES_RU,
+    EMOJI_ACTIVE,
+    EMOJI_HOME,
+    EMOJI_INACTIVE,
+    EMOJI_REMINDER,
+    NOTIFY_DESC_PREVIEW_LEN,
+)
+from claude_bot.errors import InfrastructureError, get_user_message
 from claude_bot.handlers import _build_reply_kb
 from claude_bot.keyboards import (
     build_paginated_keyboard,
     build_sessions_keyboard,
     build_status_keyboard,
 )
+from claude_bot.models.notification import Notification
+from claude_bot.services import notification_service as ns
 from claude_bot.services.claude import MODELS, get_project_dir
 from claude_bot.services.storage import SessionStorage
 from claude_bot.state import AppState
@@ -501,6 +513,118 @@ async def process_project_name(
 @router.callback_query(F.data == "noop")
 async def cb_noop(callback: CallbackQuery) -> None:
     await callback.answer()
+
+
+# ── /notify ──
+
+@router.message(Command("notify"))
+async def cmd_notify(
+    message: Message,
+    command: CommandObject,
+    settings: Settings,
+    storage: SessionStorage | None = None,
+) -> None:
+    log.info("Команда /notify")
+    uid = message.from_user.id
+    args = command.args or ""
+
+    projects_dir = get_user_projects_dir(settings, uid)
+
+    if args.strip() == "all":
+        # Все проекты
+        all_notifications: list[tuple[str, list]] = []
+        # __global__
+        global_dir = projects_dir / "__global__"
+        if global_dir.is_dir():
+            try:
+                active = ns.get_active(global_dir)
+                if active:
+                    all_notifications.append(("Общий", active))
+            except InfrastructureError as e:
+                log.warning("notify: ошибка чтения __global__: %s", e)
+        # Обычные проекты
+        if storage:
+            for name in storage.list_projects(projects_dir):
+                try:
+                    active = ns.get_active(projects_dir / name)
+                    if active:
+                        all_notifications.append((name, active))
+                except InfrastructureError as e:
+                    log.warning("notify: ошибка чтения %s: %s", name, e)
+
+        if not all_notifications:
+            await message.answer(get_user_message("notify_empty"))
+            return
+
+        text = f"{EMOJI_REMINDER} <b>Все уведомления</b>\n"
+        for proj_name, notifications in all_notifications:
+            text += f"\n<b>📂 {proj_name}</b>\n"
+            text += _format_notify_list(notifications)
+        await message.answer(text, parse_mode="HTML")
+    else:
+        # Текущий проект
+        if storage:
+            user = storage.get_user(uid)
+            project_name = user.active_project
+        else:
+            project_name = None
+
+        if project_name:
+            project_path = projects_dir / project_name
+            label = project_name
+        else:
+            project_path = projects_dir / "__global__"
+            label = "Общий"
+
+        try:
+            notifications = ns.get_active(project_path)
+        except InfrastructureError as e:
+            log.warning("notify: ошибка чтения %s: %s", project_path, e)
+            notifications = []
+
+        if not notifications:
+            await message.answer(get_user_message("notify_empty"))
+            return
+
+        text = (
+            f"{EMOJI_REMINDER} <b>Уведомления — {label}</b>\n\n"
+            + _format_notify_list(notifications)
+        )
+        await message.answer(text, parse_mode="HTML")
+
+
+def _format_notify_list(notifications: list[Notification]) -> str:
+    """Форматировать список уведомлений в HTML."""
+    lines = []
+    for n in notifications:
+        emoji = CATEGORY_EMOJI.get(n.category, EMOJI_REMINDER)
+        title = html_lib.escape(n.title)
+        line = f"{emoji} <b>{title}</b>"
+
+        # Расписание
+        if n.repeat:
+            if n.repeat.type == "daily":
+                line += f"\nЕжедневно в {n.repeat.time}"
+            elif n.repeat.type == "weekly":
+                days_str = ", ".join(
+                    DAY_NAMES_RU.get(d, d) for d in n.repeat.days
+                )
+                line += f"\nЕженедельно в {n.repeat.time} ({days_str})"
+            elif n.repeat.type == "monthly":
+                line += f"\nЕжемесячно {n.repeat.day}-го в {n.repeat.time}"
+        else:
+            dt = n.datetime
+            line += f"\nОдноразовое — {dt.strftime('%d.%m.%Y %H:%M')}"
+
+        if n.description:
+            desc = html_lib.escape(n.description[:NOTIFY_DESC_PREVIEW_LEN])
+            if len(n.description) > NOTIFY_DESC_PREVIEW_LEN:
+                desc += "..."
+            line += f"\n<i>{desc}</i>"
+
+        lines.append(line)
+
+    return "\n\n".join(lines)
 
 
 # ── /usage ──

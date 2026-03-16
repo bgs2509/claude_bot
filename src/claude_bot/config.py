@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     analytics_db: Path = Path("data/analytics.db")
     analytics_retention_days: int = 90
 
+    # Уведомления
+    notify_scan_interval: int = 60  # секунды между проверками notify.json
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
     @field_validator("users", mode="before")
