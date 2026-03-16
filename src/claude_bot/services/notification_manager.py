@@ -5,7 +5,8 @@ from __future__ import annotations
 import asyncio
 import html as html_lib
 import logging
-from datetime import datetime, timezone
+import zoneinfo
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -80,7 +81,8 @@ class NotificationManager:
 
     async def _scan_all(self, *, dry_run: bool = False) -> None:
         """Обойти всех пользователей и все их проекты."""
-        now = datetime.now(timezone.utc)
+        tz = zoneinfo.ZoneInfo(self.settings.notify_timezone)
+        now = datetime.now(tz)
         total_sent = 0
 
         for uid_str, cfg in self.settings.users.items():

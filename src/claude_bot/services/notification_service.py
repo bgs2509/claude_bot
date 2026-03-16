@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from claude_bot.errors import InfrastructureError
@@ -117,15 +117,12 @@ def _matches_repeat_schedule(repeat: RepeatRule, now: datetime) -> bool:
     return diff <= _TIME_TOLERANCE
 
 
-def _ensure_aware(dt: datetime) -> datetime:
-    """Привести datetime к UTC-aware если naive."""
-    if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
-    return dt
-
-
 def is_due(notification: Notification, now: datetime) -> list[int]:
     """Проверить, какие напоминания нужно отправить.
+
+    Args:
+        notification: Уведомление для проверки.
+        now: Текущее время в часовом поясе notify.json (aware).
 
     Returns:
         Список значений remind_before (минут), которые сейчас нужно отправить.
@@ -135,7 +132,6 @@ def is_due(notification: Notification, now: datetime) -> list[int]:
         return []
 
     due_reminders: list[int] = []
-    now = _ensure_aware(now)
 
     if notification.repeat:
         # Повторяющееся: проверяем расписание
@@ -162,7 +158,11 @@ def is_due(notification: Notification, now: datetime) -> list[int]:
         for minutes in notification.remind_before:
             if minutes in notification.sent_reminders:
                 continue
-            trigger_time = _ensure_aware(notification.datetime) - timedelta(minutes=minutes)
+            # naive datetime из notify.json трактуется в том же tz что и now
+            event_dt = notification.datetime
+            if event_dt.tzinfo is None and now.tzinfo is not None:
+                event_dt = event_dt.replace(tzinfo=now.tzinfo)
+            trigger_time = event_dt - timedelta(minutes=minutes)
             diff = (now - trigger_time).total_seconds()
             # Уведомление пора отправить если время наступило (с допуском)
             if -_TIME_TOLERANCE <= diff <= _TIME_TOLERANCE:
@@ -219,6 +219,9 @@ def get_missed(
             continue
         if n.repeat:
             continue  # повторяющиеся не пропускаются
-        if _ensure_aware(n.datetime) < now - grace:
+        event_dt = n.datetime
+        if event_dt.tzinfo is None and now.tzinfo is not None:
+            event_dt = event_dt.replace(tzinfo=now.tzinfo)
+        if event_dt < now - grace:
             missed.append(n)
     return missed

@@ -34,6 +34,7 @@ class Settings(BaseSettings):
 
     # Уведомления
     notify_scan_interval: int = 60  # секунды между проверками notify.json
+    notify_timezone: str = "Europe/Moscow"  # часовой пояс времени в notify.json
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 
