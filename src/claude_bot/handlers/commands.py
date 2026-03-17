@@ -94,17 +94,20 @@ def _status_text(
 @router.message(CommandStart())
 async def cmd_start(
     message: Message, settings: Settings, storage: SessionStorage | None = None,
+    project_tag: str = "",
 ) -> None:
     log.info("Команда /start")
     uid = message.from_user.id
     reply_kb = _build_reply_kb(storage, settings, uid)
     await message.answer(
+        project_tag +
         "Claude Code Bot\n\n"
         "Что умею:\n"
         "• Текст, голос, фото, файлы → Claude ответит\n"
         "• Работаю с кодом, файловой системой, bash\n"
         "• Проекты и сессии — /status\n\n"
         "/help — полная справка и все команды",
+        parse_mode="HTML",
         reply_markup=reply_kb,
     )
 
@@ -112,9 +115,10 @@ async def cmd_start(
 # ── /help ──
 
 @router.message(Command("help"))
-async def cmd_help(message: Message) -> None:
+async def cmd_help(message: Message, project_tag: str = "") -> None:
     log.info("Команда /help")
     await message.answer(
+        project_tag +
         "📖 <b>Как пользоваться ботом</b>\n\n"
 
         "<b>Что можно отправлять:</b>\n"
@@ -156,6 +160,7 @@ async def cmd_help(message: Message) -> None:
 @router.message(Command("new"))
 async def cmd_new(
     message: Message, app_state: AppState, storage: SessionStorage | None = None,
+    project_tag: str = "",
 ) -> None:
     uid = message.from_user.id
     log.info("Команда /new — сброс сессии")
@@ -167,10 +172,11 @@ async def cmd_new(
 
     if session_name:
         await message.answer(
-            f"Сессия «{session_name}» сброшена. Следующее сообщение начнёт новую.",
+            project_tag + f"Сессия «{session_name}» сброшена. Следующее сообщение начнёт новую.",
+            parse_mode="HTML",
         )
     else:
-        await message.answer("Сессия сброшена. Следующее сообщение начнёт новую.")
+        await message.answer(project_tag + "Сессия сброшена. Следующее сообщение начнёт новую.", parse_mode="HTML")
 
 
 # ── /cancel ──
@@ -178,30 +184,31 @@ async def cmd_new(
 @router.message(Command("cancel"))
 async def cmd_cancel(
     message: Message, app_state: AppState, state: FSMContext,
+    project_tag: str = "",
 ) -> None:
     uid = message.from_user.id
     current_state = await state.get_state()
     if current_state:
         await state.clear()
-        await message.answer("Действие отменено.")
+        await message.answer(project_tag + "Действие отменено.", parse_mode="HTML")
         return
 
     proc = app_state.active_processes.pop(uid, None)
     if proc:
         proc.kill()
         log.info("Команда /cancel — killed")
-        await message.answer("Запрос отменён.")
+        await message.answer(project_tag + "Запрос отменён.", parse_mode="HTML")
     else:
         log.info("Команда /cancel — нет процесса")
-        await message.answer("Нет активного запроса.")
+        await message.answer(project_tag + "Нет активного запроса.", parse_mode="HTML")
 
 
 # ── /model ──
 
 @router.message(Command("model"))
-async def cmd_model(message: Message, command: CommandObject, app_state: AppState, role: str) -> None:
+async def cmd_model(message: Message, command: CommandObject, app_state: AppState, role: str, project_tag: str = "") -> None:
     if role != "admin":
-        await message.answer("Только для admin.")
+        await message.answer(project_tag + "Только для admin.", parse_mode="HTML")
         return
 
     uid = message.from_user.id
@@ -210,29 +217,29 @@ async def cmd_model(message: Message, command: CommandObject, app_state: AppStat
     if not args:
         current = app_state.user_models.get(uid, "sonnet")
         names = " | ".join(MODELS.keys())
-        await message.answer(f"Модель: {current}\nДоступные: {names}")
+        await message.answer(project_tag + f"Модель: {current}\nДоступные: {names}", parse_mode="HTML")
         return
 
     name = args.strip().lower()
     if name not in MODELS:
-        await message.answer(f"Неизвестная модель. Доступные: {' | '.join(MODELS.keys())}")
+        await message.answer(project_tag + f"Неизвестная модель. Доступные: {' | '.join(MODELS.keys())}", parse_mode="HTML")
         return
 
     app_state.user_models[uid] = name
     log.info("Команда /model: %s", name)
-    await message.answer(f"Модель: {name}")
+    await message.answer(project_tag + f"Модель: {name}", parse_mode="HTML")
 
 
 # ── /voice ──
 
 @router.message(Command("voice"))
-async def cmd_voice(message: Message, app_state: AppState) -> None:
+async def cmd_voice(message: Message, app_state: AppState, project_tag: str = "") -> None:
     uid = message.from_user.id
     current = app_state.user_voice_mode.get(uid, False)
     app_state.user_voice_mode[uid] = not current
     status = "включён" if not current else "выключен"
     log.info("Команда /voice: %s", status)
-    await message.answer(f"Голосовой режим {status}")
+    await message.answer(project_tag + f"Голосовой режим {status}", parse_mode="HTML")
 
 
 # ── /status ──
@@ -243,6 +250,7 @@ async def cmd_status(
     app_state: AppState,
     settings: Settings,
     storage: SessionStorage | None = None,
+    project_tag: str = "",
 ) -> None:
     log.info("Команда /status")
     uid = message.from_user.id
@@ -257,9 +265,9 @@ async def cmd_status(
             text += "\n\nОтправь сообщение — бот работает в общей директории.\nИли создай проект:"
 
         markup = build_status_keyboard(projects, user.active_project)
-        await message.answer(text, reply_markup=markup)
+        await message.answer(project_tag + text, parse_mode="HTML", reply_markup=markup)
     else:
-        await message.answer(text)
+        await message.answer(project_tag + text, parse_mode="HTML")
 
 
 # ── /status callback: главный экран ──
@@ -272,16 +280,17 @@ async def cb_status_main(
     storage: SessionStorage,
 ) -> None:
     uid = callback.from_user.id
+    user = storage.get_user(uid)
+    tag = f"<code>[{user.active_project or 'Общий'}]</code>\n\n"
     text = _status_text(storage, uid, app_state, settings)
     projects_dir = get_user_projects_dir(settings, uid)
     projects = storage.list_projects(projects_dir)
-    user = storage.get_user(uid)
 
     if not projects:
         text += "\n\nОтправь сообщение — бот работает в общей директории.\nИли создай проект:"
 
     markup = build_status_keyboard(projects, user.active_project)
-    await callback.message.edit_text(text, reply_markup=markup)
+    await callback.message.edit_text(tag + text, parse_mode="HTML", reply_markup=markup)
     await callback.answer()
 
 
@@ -301,13 +310,14 @@ async def cb_status_project(
         await callback.answer(f"Проект '{project_name}' не найден", show_alert=True)
         return
     log.info("Status: проект выбран %s", project_name)
+    tag = f"<code>[{project_name}]</code>\n\n"
     sessions = storage.get_project_sessions(uid, project_name)
     active_sid = storage.get_project_active_session_id(uid, project_name)
 
     items = [(s.name, s.id) for s in sessions]
     text = f"{EMOJI_INACTIVE} {project_name}" if sessions else f"{EMOJI_INACTIVE} {project_name}\n\nСессий пока нет."
     markup = build_sessions_keyboard(items, active_sid)
-    await callback.message.edit_text(text, reply_markup=markup)
+    await callback.message.edit_text(tag + text, parse_mode="HTML", reply_markup=markup)
     await callback.answer()
 
 
@@ -329,12 +339,13 @@ async def cb_status_select_session(
     log.info("Status: сессия выбрана %s", sid[:8])
 
     # Вернуться на главный экран статуса
+    user = storage.get_user(uid)
+    tag = f"<code>[{user.active_project or 'Общий'}]</code>\n\n"
     text = _status_text(storage, uid, app_state, settings)
     projects_dir = get_user_projects_dir(settings, uid)
     projects = storage.list_projects(projects_dir)
-    user = storage.get_user(uid)
     markup = build_status_keyboard(projects, user.active_project)
-    await callback.message.edit_text(text, reply_markup=markup)
+    await callback.message.edit_text(tag + text, parse_mode="HTML", reply_markup=markup)
     await callback.answer("Сессия переключена")
 
 
@@ -350,13 +361,14 @@ async def cb_status_sessions_page(
     page = int(callback.data.split(":")[2])
     user = storage.get_user(uid)
     project_name = user.active_project or "__global__"
+    tag = f"<code>[{user.active_project or 'Общий'}]</code>\n\n"
     sessions = storage.get_project_sessions(uid, project_name)
     active_sid = storage.get_project_active_session_id(uid, project_name)
 
     items = [(s.name, s.id) for s in sessions]
     text = f"{EMOJI_INACTIVE} {project_name}"
     markup = build_sessions_keyboard(items, active_sid, page=page)
-    await callback.message.edit_text(text, reply_markup=markup)
+    await callback.message.edit_text(tag + text, parse_mode="HTML", reply_markup=markup)
     await callback.answer()
 
 
@@ -374,12 +386,13 @@ async def cb_status_new_session(
     app_state.user_sessions.pop(uid, None)
     log.info("Status: новая сессия")
 
+    user = storage.get_user(uid)
+    tag = f"<code>[{user.active_project or 'Общий'}]</code>\n\n"
     text = _status_text(storage, uid, app_state, settings)
     projects_dir = get_user_projects_dir(settings, uid)
     projects = storage.list_projects(projects_dir)
-    user = storage.get_user(uid)
     markup = build_status_keyboard(projects, user.active_project)
-    await callback.message.edit_text(text, reply_markup=markup)
+    await callback.message.edit_text(tag + text, parse_mode="HTML", reply_markup=markup)
     await callback.answer("Новая сессия создана")
 
 
@@ -396,6 +409,7 @@ async def cb_status_home(
     await storage.clear_active_project(uid)
     log.info("Status: сброс проекта")
 
+    tag = "<code>[Общий]</code>\n\n"
     # Показать сессии __global__ (единообразно с проектами)
     sessions = storage.get_project_sessions(uid, "__global__")
     active_sid = storage.get_project_active_session_id(uid, "__global__")
@@ -404,7 +418,7 @@ async def cb_status_home(
     if not sessions:
         text += "\n\nСессий пока нет."
     markup = build_sessions_keyboard(items, active_sid)
-    await callback.message.edit_text(text, reply_markup=markup)
+    await callback.message.edit_text(tag + text, parse_mode="HTML", reply_markup=markup)
     await callback.answer()
 
 
@@ -412,10 +426,11 @@ async def cb_status_home(
 
 @router.callback_query(F.data == "st:newproj")
 async def cb_status_new_project(
-    callback: CallbackQuery, state: FSMContext,
+    callback: CallbackQuery, state: FSMContext, project_tag: str = "",
 ) -> None:
     await callback.message.edit_text(
-        "Введи название проекта (a-z, 0-9, -, _, макс 32):",
+        project_tag + "Введи название проекта (a-z, 0-9, -, _, макс 32):",
+        parse_mode="HTML",
     )
     await state.set_state(CreateProject.waiting_name)
     await callback.answer()
@@ -426,6 +441,7 @@ async def cb_status_new_project(
 @router.callback_query(F.data.startswith("p:list:"))
 async def cb_project_list(
     callback: CallbackQuery, storage: SessionStorage, settings: Settings,
+    project_tag: str = "",
 ) -> None:
     uid = callback.from_user.id
     page = int(callback.data.split(":")[2])
@@ -444,7 +460,7 @@ async def cb_project_list(
         back_callback="st:main",
         more_prefix="p:list:",
     )
-    await callback.message.edit_text("Проекты:", reply_markup=markup)
+    await callback.message.edit_text(project_tag + "Проекты:", parse_mode="HTML", reply_markup=markup)
     await callback.answer()
 
 
@@ -466,13 +482,15 @@ async def cb_select_project(
         return
     log.info("Status: проект выбран %s", name)
 
+    # Пересчитать тег после смены проекта
+    tag = f"<code>[{name}]</code>\n\n"
     # Показать сессии выбранного проекта
     sessions = storage.get_project_sessions(uid, name)
     active_sid = storage.get_project_active_session_id(uid, name)
     items = [(s.name, s.id) for s in sessions]
     text = f"{EMOJI_INACTIVE} {name}" if sessions else f"{EMOJI_INACTIVE} {name}\n\nСессий пока нет."
     markup = build_sessions_keyboard(items, active_sid)
-    await callback.message.edit_text(text, reply_markup=markup)
+    await callback.message.edit_text(tag + text, parse_mode="HTML", reply_markup=markup)
     await callback.answer(f"Проект: {name}")
 
 
@@ -481,12 +499,13 @@ async def cb_select_project(
 @router.message(CreateProject.waiting_name)
 async def process_project_name(
     message: Message, state: FSMContext, storage: SessionStorage, settings: Settings,
-    app_state: AppState,
+    app_state: AppState, project_tag: str = "",
 ) -> None:
     name = message.text.strip() if message.text else ""
     if not re.match(r"^[a-zA-Z0-9_-]{1,32}$", name):
         await message.answer(
-            "Недопустимое имя. Используй a-z, 0-9, -, _ (макс 32 символа).",
+            project_tag + "Недопустимое имя. Используй a-z, 0-9, -, _ (макс 32 символа).",
+            parse_mode="HTML",
         )
         return
 
@@ -496,16 +515,19 @@ async def process_project_name(
     log.info("Status: проект создан %s", name)
     await state.clear()
 
+    # Пересчитать тег — теперь активный проект изменился
+    tag = f"<code>[{name}]</code>\n\n"
     reply_kb = _build_reply_kb(storage, settings, uid)
     text = _status_text(storage, uid, app_state, settings)
     projects = storage.list_projects(projects_dir)
     user = storage.get_user(uid)
     markup = build_status_keyboard(projects, user.active_project)
     await message.answer(
-        f"Проект '{name}' создан.\n\n{text}",
+        tag + f"Проект '{name}' создан.\n\n{text}",
+        parse_mode="HTML",
         reply_markup=reply_kb,
     )
-    await message.answer("Проекты:", reply_markup=markup)
+    await message.answer(tag + "Проекты:", parse_mode="HTML", reply_markup=markup)
 
 
 # ── /status callback: заглушка ──
@@ -523,6 +545,7 @@ async def cmd_notify(
     command: CommandObject,
     settings: Settings,
     storage: SessionStorage | None = None,
+    project_tag: str = "",
 ) -> None:
     log.info("Команда /notify")
     uid = message.from_user.id
@@ -553,14 +576,14 @@ async def cmd_notify(
                     log.warning("notify: ошибка чтения %s: %s", name, e)
 
         if not all_notifications:
-            await message.answer(get_user_message("notify_empty"))
+            await message.answer(project_tag + get_user_message("notify_empty"), parse_mode="HTML")
             return
 
         text = f"{EMOJI_REMINDER} <b>Все уведомления</b>\n"
         for proj_name, notifications in all_notifications:
             text += f"\n<b>📂 {proj_name}</b>\n"
             text += _format_notify_list(notifications)
-        await message.answer(text, parse_mode="HTML")
+        await message.answer(project_tag + text, parse_mode="HTML")
     else:
         # Текущий проект
         if storage:
@@ -583,14 +606,14 @@ async def cmd_notify(
             notifications = []
 
         if not notifications:
-            await message.answer(get_user_message("notify_empty"))
+            await message.answer(project_tag + get_user_message("notify_empty"), parse_mode="HTML")
             return
 
         text = (
             f"{EMOJI_REMINDER} <b>Уведомления — {label}</b>\n\n"
             + _format_notify_list(notifications)
         )
-        await message.answer(text, parse_mode="HTML")
+        await message.answer(project_tag + text, parse_mode="HTML")
 
 
 def _format_notify_list(notifications: list[Notification]) -> str:
@@ -630,7 +653,7 @@ def _format_notify_list(notifications: list[Notification]) -> str:
 # ── /usage ──
 
 @router.message(Command("usage"))
-async def cmd_usage(message: Message, settings: Settings, app_state: AppState) -> None:
+async def cmd_usage(message: Message, settings: Settings, app_state: AppState, project_tag: str = "") -> None:
     log.info("Команда /usage")
     uid = message.from_user.id
     count_data = app_state.user_daily_count.get(uid, {})
@@ -641,16 +664,16 @@ async def cmd_usage(message: Message, settings: Settings, app_state: AppState) -
         else 0
     )
 
-    await message.answer(f"Сегодня: {today_count} сообщений")
+    await message.answer(project_tag + f"Сегодня: {today_count} сообщений", parse_mode="HTML")
 
 
 # ── /stats ──
 
 @router.message(Command("stats"))
-async def cmd_stats(message: Message, settings: Settings, app_state: AppState, role: str) -> None:
+async def cmd_stats(message: Message, settings: Settings, app_state: AppState, role: str, project_tag: str = "") -> None:
     log.info("Команда /stats")
     if role != "admin":
-        await message.answer("Только для admin.")
+        await message.answer(project_tag + "Только для admin.", parse_mode="HTML")
         return
 
     lines = ["Статистика:\n"]
@@ -667,4 +690,4 @@ async def cmd_stats(message: Message, settings: Settings, app_state: AppState, r
         limit_str = f"{today_count}/{limit}" if limit else f"{today_count}/∞"
         lines.append(f"  {name} ({user_role}): {limit_str} сегодня")
 
-    await message.answer("\n".join(lines))
+    await message.answer(project_tag + "\n".join(lines), parse_mode="HTML")

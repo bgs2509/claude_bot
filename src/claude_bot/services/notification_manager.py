@@ -99,6 +99,7 @@ class NotificationManager:
                 try:
                     sent = await self._check_project(
                         uid, project_path, now, dry_run=dry_run,
+                        projects_dir=projects_dir,
                     )
                     total_sent += sent
                 except InfrastructureError as e:
@@ -140,6 +141,7 @@ class NotificationManager:
         now: datetime,
         *,
         dry_run: bool = False,
+        projects_dir: Path | None = None,
     ) -> int:
         """Проверить один проект, отправить все due-уведомления.
 
@@ -165,6 +167,10 @@ class NotificationManager:
                 ns.mark_sent(project_path, notification, due_minutes)
                 continue
 
+            # Вычислить тег проекта
+            proj_name = project_path.name if project_path.name != "__global__" else "Общий"
+            tag = f"<code>[{proj_name}]</code>\n\n"
+
             # Отправить каждому авторизованному получателю
             for minutes in due_minutes:
                 text = _format_notification(notification, minutes)
@@ -175,7 +181,7 @@ class NotificationManager:
                             recipient,
                         )
                         continue
-                    await self._send(recipient, text)
+                    await self._send(recipient, tag + text)
 
             ns.mark_sent(project_path, notification, due_minutes)
             sent_count += 1

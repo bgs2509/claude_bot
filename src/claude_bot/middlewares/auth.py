@@ -73,6 +73,14 @@ class AuthMiddleware(BaseMiddleware):
             data["user_config"] = user_cfg
             data["role"] = user_cfg.get("role", "readonly") if user_cfg else "readonly"
 
+            # Project tag для всех сообщений
+            if self.storage:
+                _user_data = self.storage.get_user(uid)
+                _proj = _user_data.active_project or "Общий"
+            else:
+                _proj = "Общий"
+            data["project_tag"] = f"<code>[{_proj}]</code>\n\n"
+
         return await handler(event, data)
 
     def _is_allowed(self, uid: int) -> bool:

@@ -32,6 +32,7 @@ async def handle_document(
     settings: Settings,
     app_state: AppState,
     storage: SessionStorage | None = None,
+    project_tag: str = "",
 ) -> None:
     uid = message.from_user.id
     wait = check_rate_limit(uid, settings, app_state)
@@ -43,13 +44,13 @@ async def handle_document(
     doc = message.document
     if doc.file_size > settings.max_upload_size:
         limit_mb = settings.max_upload_size // 1_048_576
-        await message.answer(get_user_message("file_too_large", limit_mb=limit_mb))
+        await message.answer(project_tag + get_user_message("file_too_large", limit_mb=limit_mb), parse_mode="HTML")
         return
 
     try:
         project_dir = get_project_dir(settings, storage, uid)
     except ValueError:
-        await message.answer(get_user_message("no_active_project"))
+        await message.answer(project_tag + get_user_message("no_active_project"), parse_mode="HTML")
         return
 
     filename = doc.file_name or "unnamed_file"
@@ -57,7 +58,7 @@ async def handle_document(
     caption = message.caption or "Проанализируй этот файл"
 
     log.info("Документ: %s (%d bytes, binary=%s)", filename, doc.file_size, binary)
-    waiting = await message.answer("📄 Сохраняю файл в проект...")
+    waiting = await message.answer(project_tag + "📄 Сохраняю файл в проект...", parse_mode="HTML")
     tmp_path = await download_file(message.bot, doc.file_id, f"_{filename}")
 
     # Очистить предыдущий pending если есть
@@ -75,7 +76,8 @@ async def handle_document(
             chat_id=message.chat.id,
         )
         await waiting.edit_text(
-            get_user_message("file_collision", filename=filename),
+            project_tag + get_user_message("file_collision", filename=filename),
+            parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
                 InlineKeyboardButton(
                     text="Перезаписать", callback_data="upload:overwrite",
@@ -89,8 +91,8 @@ async def handle_document(
 
     saved = save_uploaded_file(tmp_path, project_dir, filename)
     prompt = build_file_prompt(filename, saved, binary, caption)
-    await waiting.edit_text("⏳ Claude думает...")
-    await call_claude_safe(message, waiting, prompt, uid, settings, app_state, storage)
+    await waiting.edit_text(project_tag + "⏳ Claude думает...", parse_mode="HTML")
+    await call_claude_safe(message, waiting, prompt, uid, settings, app_state, storage, project_tag=project_tag)
 
 
 def _cleanup_tmp(path: str) -> None:

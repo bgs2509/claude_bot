@@ -31,6 +31,7 @@ async def handle_photo(
     settings: Settings,
     app_state: AppState,
     storage: SessionStorage | None = None,
+    project_tag: str = "",
 ) -> None:
     uid = message.from_user.id
     wait = check_rate_limit(uid, settings, app_state)
@@ -42,14 +43,14 @@ async def handle_photo(
     try:
         project_dir = get_project_dir(settings, storage, uid)
     except ValueError:
-        await message.answer(get_user_message("no_active_project"))
+        await message.answer(project_tag + get_user_message("no_active_project"), parse_mode="HTML")
         return
 
     filename = generate_photo_filename()
     caption = message.caption or "Проанализируй это изображение"
 
     log.info("Фото → %s", filename)
-    waiting = await message.answer("📷 Сохраняю фото в проект...")
+    waiting = await message.answer(project_tag + "📷 Сохраняю фото в проект...", parse_mode="HTML")
 
     tmp_path = await download_file(message.bot, message.photo[-1].file_id, ".jpg")
 
@@ -63,5 +64,5 @@ async def handle_photo(
         filename, saved, is_binary=True, caption=caption, ocr_text=ocr_text,
     )
 
-    await waiting.edit_text("⏳ Claude думает...")
-    await call_claude_safe(message, waiting, prompt, uid, settings, app_state, storage)
+    await waiting.edit_text(project_tag + "⏳ Claude думает...", parse_mode="HTML")
+    await call_claude_safe(message, waiting, prompt, uid, settings, app_state, storage, project_tag=project_tag)

@@ -26,6 +26,7 @@ async def handle_voice(
     settings: Settings,
     app_state: AppState,
     storage: SessionStorage | None = None,
+    project_tag: str = "",
 ) -> None:
     uid = message.from_user.id
     wait = check_rate_limit(uid, settings, app_state)
@@ -36,19 +37,20 @@ async def handle_voice(
     track_usage(uid, app_state)
 
     log.info("Голосовое сообщение")
-    waiting = await message.answer("🎤 Транскрибирую...")
+    waiting = await message.answer(project_tag + "🎤 Транскрибирую...", parse_mode="HTML")
 
     ogg_path = await download_file(message.bot, message.voice.file_id, ".ogg")
 
     text = await transcribe_voice(ogg_path, settings, app_state)
     if not text:
-        await waiting.edit_text(get_user_message("voice_not_recognized"))
+        await waiting.edit_text(project_tag + get_user_message("voice_not_recognized"), parse_mode="HTML")
         return
 
-    await waiting.edit_text(f"🎤 Распознано: {text}\n\n⏳ Claude думает...")
+    await waiting.edit_text(project_tag + f"🎤 Распознано: {text}\n\n⏳ Claude думает...", parse_mode="HTML")
 
     response = await call_claude_safe(
         message, waiting, text, uid, settings, app_state, storage,
+        project_tag=project_tag,
     )
     if response:
         await send_voice_if_enabled(message, response.text, uid, settings, app_state)

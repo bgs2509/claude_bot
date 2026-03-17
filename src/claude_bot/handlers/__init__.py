@@ -72,14 +72,17 @@ async def _send_html_or_plain(
     message: types.Message,
     text: str,
     reply_markup: types.ReplyKeyboardMarkup | None = None,
+    project_tag: str = "",
 ) -> None:
     """Отправить сообщение как HTML, при ошибке — plain text."""
     formatted = markdown_to_telegram_html(text)
     try:
-        await message.answer(formatted, parse_mode="HTML", reply_markup=reply_markup)
+        await message.answer(project_tag + formatted, parse_mode="HTML", reply_markup=reply_markup)
     except Exception:
         log.debug("HTML parse failed, fallback to plain", exc_info=True)
-        await message.answer(text, reply_markup=reply_markup)
+        # Убрать <code> теги из project_tag для plain text
+        plain_tag = project_tag.replace("<code>", "").replace("</code>", "") if project_tag else ""
+        await message.answer(plain_tag + text, reply_markup=reply_markup)
 
 
 async def send_long(
@@ -87,18 +90,19 @@ async def send_long(
     text: str,
     max_len: int = 4000,
     reply_markup: types.ReplyKeyboardMarkup | None = None,
+    project_tag: str = "",
 ) -> None:
     """Отправка ответа. Если > max_len — первый чанк + .md файл."""
     if not text.strip():
         text = "(пустой ответ)"
 
     if len(text) <= max_len:
-        await _send_html_or_plain(message, text, reply_markup=reply_markup)
+        await _send_html_or_plain(message, text, reply_markup=reply_markup, project_tag=project_tag)
         return
 
     # Первый чанк + файл с полным ответом
     preview = text[:max_len]
-    await _send_html_or_plain(message, preview)
+    await _send_html_or_plain(message, preview, project_tag=project_tag)
 
     md_path = tempfile.mktemp(suffix=".md")
     with open(md_path, "w", encoding="utf-8") as f:
@@ -138,6 +142,7 @@ async def call_claude_safe(
     settings: Settings,
     app_state: AppState,
     storage: "SessionStorage | None" = None,
+    project_tag: str = "",
 ) -> ClaudeResponse | None:
     """Вызвать run_claude с обработкой ошибок и cleanup waiting-сообщения.
 
@@ -149,6 +154,7 @@ async def call_claude_safe(
         settings: Конфигурация бота.
         app_state: In-memory состояние приложения.
         storage: Хранилище сессий (опционально).
+        project_tag: HTML-тег проекта для префикса сообщений.
 
     Returns:
         ClaudeResponse или None при ошибке.
@@ -156,7 +162,7 @@ async def call_claude_safe(
     try:
         response = await run_claude(prompt, uid, settings, app_state, storage=storage)
         reply_markup = _build_reply_kb(storage, settings, uid)
-        await send_long(message, response.text, settings.max_message_len, reply_markup=reply_markup)
+        await send_long(message, response.text, settings.max_message_len, reply_markup=reply_markup, project_tag=project_tag)
         if response.files:
             await send_files(message, response.files)
         obs_status_var.set("claude_success")
@@ -165,7 +171,7 @@ async def call_claude_safe(
     except Exception:
         log.error("Ошибка run_claude", exc_info=True)
         obs_status_var.set("claude_error")
-        await message.answer(get_user_message("claude_error"))
+        await message.answer(project_tag + get_user_message("claude_error"), parse_mode="HTML")
         return None
     finally:
         await safe_delete(waiting)

@@ -24,6 +24,7 @@ async def handle_text(
     settings: Settings,
     app_state: AppState,
     storage: SessionStorage | None = None,
+    project_tag: str = "",
 ) -> None:
     uid = message.from_user.id
     wait = check_rate_limit(uid, settings, app_state)
@@ -39,10 +40,11 @@ async def handle_text(
         return
 
     log.info("Текст, len=%d", len(prompt))
-    waiting = await message.answer("⏳ Claude думает...")
+    waiting = await message.answer(project_tag + "⏳ Claude думает...", parse_mode="HTML")
 
     response = await call_claude_safe(
         message, waiting, prompt, uid, settings, app_state, storage,
+        project_tag=project_tag,
     )
     if response:
         await send_voice_if_enabled(message, response.text, uid, settings, app_state)

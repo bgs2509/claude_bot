@@ -23,8 +23,9 @@ async def cb_overwrite(
     settings: Settings,
     app_state: AppState,
     storage: SessionStorage | None = None,
+    project_tag: str = "",
 ) -> None:
-    await _resolve(callback, settings, app_state, storage, overwrite=True)
+    await _resolve(callback, settings, app_state, storage, overwrite=True, project_tag=project_tag)
 
 
 @router.callback_query(F.data == "upload:suffix")
@@ -33,8 +34,9 @@ async def cb_suffix(
     settings: Settings,
     app_state: AppState,
     storage: SessionStorage | None = None,
+    project_tag: str = "",
 ) -> None:
-    await _resolve(callback, settings, app_state, storage, overwrite=False)
+    await _resolve(callback, settings, app_state, storage, overwrite=False, project_tag=project_tag)
 
 
 async def _resolve(
@@ -44,6 +46,7 @@ async def _resolve(
     storage: SessionStorage | None,
     *,
     overwrite: bool,
+    project_tag: str = "",
 ) -> None:
     uid = callback.from_user.id
     pending = app_state.pending_uploads.pop(uid, None)
@@ -63,8 +66,8 @@ async def _resolve(
         ocr_text=pending.ocr_text,
     )
 
-    await callback.message.edit_text("⏳ Claude думает...")
+    await callback.message.edit_text(project_tag + "⏳ Claude думает...", parse_mode="HTML")
     await call_claude_safe(
         callback.message, callback.message, prompt, uid,
-        settings, app_state, storage,
+        settings, app_state, storage, project_tag=project_tag,
     )

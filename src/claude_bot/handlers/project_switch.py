@@ -81,6 +81,7 @@ async def handle_project_button(
     button_type: str,
     project_name: str | None,
     state: FSMContext,
+    project_tag: str = "",
 ) -> None:
     """Обработать нажатие reply-кнопки проекта."""
     uid = message.from_user.id
@@ -95,7 +96,7 @@ async def handle_project_button(
         return
 
     if button_type == "create":
-        await _handle_create(message, state)
+        await _handle_create(message, state, project_tag=project_tag)
         return
 
     # active или inactive — переключить проект
@@ -142,14 +143,15 @@ async def _handle_home(
         storage.list_projects(projects_dir), None,
     )
     await message.react([ReactionTypeEmoji(emoji=EMOJI_REACTION)])
-    await message.answer(f"{EMOJI_HOME} Общий", reply_markup=keyboard)
+    tag = "<code>[Общий]</code>\n\n"
+    await message.answer(tag + f"{EMOJI_HOME} Общий", parse_mode="HTML", reply_markup=keyboard)
 
 
-async def _handle_create(message: Message, state: FSMContext) -> None:
+async def _handle_create(message: Message, state: FSMContext, project_tag: str = "") -> None:
     """Начать FSM создания проекта."""
     from claude_bot.handlers.commands import CreateProject
     await state.set_state(CreateProject.waiting_name)
-    await message.answer("Введи название проекта (a-z, 0-9, -, _, макс 32):")
+    await message.answer(project_tag + "Введи название проекта (a-z, 0-9, -, _, макс 32):", parse_mode="HTML")
 
 
 async def _handle_switch(
@@ -187,8 +189,9 @@ async def _handle_switch(
     keyboard = build_project_reply_keyboard(
         storage.list_projects(projects_dir), project_name,
     )
+    tag = f"<code>[{project_name}]</code>\n\n"
     label = f"{EMOJI_ACTIVE} {project_name}"
     if session_name:
         label += f" · {session_name}"
     await message.react([ReactionTypeEmoji(emoji=EMOJI_REACTION)])
-    await message.answer(label, reply_markup=keyboard)
+    await message.answer(tag + label, parse_mode="HTML", reply_markup=keyboard)
