@@ -9,7 +9,7 @@ from claude_bot.bot import create_bot, create_dispatcher
 from claude_bot.config import Settings
 from claude_bot.logging_setup import setup_logging, setup_sentry
 from claude_bot.services.analytics import EventLogger
-from claude_bot.services.notification_manager import NotificationManager
+from claude_bot.services.planner_manager import PlannerManager
 from claude_bot.services.storage import SessionStorage
 from claude_bot.state import AppState
 
@@ -39,13 +39,13 @@ async def _run(settings: Settings) -> None:
 
     bot = create_bot(settings)
 
-    # Менеджер уведомлений
-    notify_manager = NotificationManager(bot=bot, settings=settings, storage=storage)
+    # Менеджер планировщика (заменяет NotificationManager)
+    planner_manager = PlannerManager(bot=bot, settings=settings, storage=storage)
     try:
-        await notify_manager.init()
+        await planner_manager.init()
     except Exception as e:
-        log.warning("NotificationManager не инициализирован: %s", e)
-        notify_manager = None
+        log.warning("PlannerManager не инициализирован: %s", e)
+        planner_manager = None
 
     # Установить команды бота в меню Telegram
     try:
@@ -53,6 +53,7 @@ async def _run(settings: Settings) -> None:
         await bot.set_my_commands([
             BotCommand(command="status", description="Проекты, сессии, настройки"),
             BotCommand(command="new", description="Новая сессия"),
+            BotCommand(command="plan", description="План дня"),
             BotCommand(command="notify", description="Список уведомлений"),
             BotCommand(command="model", description="Сменить модель"),
             BotCommand(command="voice", description="Вкл/выкл голосовые ответы"),
@@ -66,8 +67,8 @@ async def _run(settings: Settings) -> None:
     try:
         await dp.start_polling(bot)
     finally:
-        if notify_manager:
-            await notify_manager.close()
+        if planner_manager:
+            await planner_manager.close()
         if event_logger:
             await event_logger.close()
 

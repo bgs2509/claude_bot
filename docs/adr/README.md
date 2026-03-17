@@ -26,6 +26,7 @@
 | [008](008-uv.md) | uv как пакетный менеджер | Принято | 2026-03-06 |
 | [009](009-observability.md) | Observability-стек (JSON-логи + SQLite + Sentry) | Принято | 2026-03-09 |
 | [010](010-exception-hierarchy.md) | Иерархия исключений с каталогом user-friendly сообщений | Принято | 2026-03-15 |
+| [011](ADR-011-unified-plan-item-model.md) | Единая модель PlanItem для задач и уведомлений | Принято | 2026-03-17 |
 
 ## Шаблон нового ADR
 

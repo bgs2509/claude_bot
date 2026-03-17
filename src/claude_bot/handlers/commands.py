@@ -3,7 +3,9 @@
 import html as html_lib
 import logging
 import re
-from datetime import date
+import zoneinfo
+from datetime import date, datetime, timedelta
+from pathlib import Path
 
 from aiogram import F, Router
 from aiogram.filters import Command, CommandObject, CommandStart
@@ -20,17 +22,26 @@ from claude_bot.constants import (
     EMOJI_INACTIVE,
     EMOJI_REMINDER,
     NOTIFY_DESC_PREVIEW_LEN,
+    PLAN_CB_DAY,
+    PLAN_CB_WEEK,
 )
 from claude_bot.errors import InfrastructureError, get_user_message
 from claude_bot.handlers import _build_reply_kb
 from claude_bot.keyboards import (
     build_paginated_keyboard,
+    build_plan_keyboard,
     build_sessions_keyboard,
     build_status_keyboard,
 )
 from claude_bot.models.notification import Notification
+from claude_bot.models.planner import PlanItem
 from claude_bot.services import notification_service as ns
+from claude_bot.services import planner_service as pls
 from claude_bot.services.claude import MODELS, get_project_dir
+from claude_bot.services.planner_formatter import (
+    format_day_plan,
+    format_week_overview,
+)
 from claude_bot.services.storage import SessionStorage
 from claude_bot.state import AppState
 
@@ -537,7 +548,137 @@ async def cb_noop(callback: CallbackQuery) -> None:
     await callback.answer()
 
 
-# ── /notify ──
+# ── /plan ──
+
+
+def _now_local(settings: Settings) -> datetime:
+    """Текущее время в часовом поясе планировщика."""
+    tz = zoneinfo.ZoneInfo(settings.notify_timezone)
+    return datetime.now(tz)
+
+
+@router.message(Command("plan"))
+async def cmd_plan(
+    message: Message,
+    command: CommandObject,
+    settings: Settings,
+    storage: SessionStorage | None = None,
+    project_tag: str = "",
+) -> None:
+    """Показать план на сегодня с навигацией по дням."""
+    log.info("Команда /plan")
+    uid = message.from_user.id
+    args = command.args or ""
+
+    now = _now_local(settings)
+    today = now.date()
+
+    # Собрать все проекты пользователя
+    projects_dir = get_user_projects_dir(settings, uid)
+    all_items = _collect_plan_items(projects_dir, storage, today)
+
+    # Фильтр по категории
+    category_filter = args.strip().lower() if args.strip() else None
+    if category_filter:
+        all_items = [i for i in all_items if i.category == category_filter]
+
+    text = format_day_plan(today, all_items, now)
+    markup = build_plan_keyboard(today)
+    await message.answer(
+        project_tag + text,
+        parse_mode="HTML",
+        reply_markup=markup,
+    )
+
+
+@router.callback_query(F.data.startswith(PLAN_CB_DAY))
+async def cb_plan_day(
+    callback: CallbackQuery,
+    settings: Settings,
+    storage: SessionStorage | None = None,
+) -> None:
+    """Навигация по дням: показать план на выбранную дату."""
+    uid = callback.from_user.id
+    date_str = callback.data[len(PLAN_CB_DAY):]
+    try:
+        d = date.fromisoformat(date_str)
+    except ValueError:
+        await callback.answer("Некорректная дата", show_alert=True)
+        return
+
+    now = _now_local(settings)
+
+    projects_dir = get_user_projects_dir(settings, uid)
+    items = _collect_plan_items(projects_dir, storage, d)
+
+    text = format_day_plan(d, items, now)
+    markup = build_plan_keyboard(d)
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=markup)
+    await callback.answer()
+
+
+@router.callback_query(F.data == PLAN_CB_WEEK)
+async def cb_plan_week(
+    callback: CallbackQuery,
+    settings: Settings,
+    storage: SessionStorage | None = None,
+) -> None:
+    """Обзор текущей недели."""
+    uid = callback.from_user.id
+
+    now = _now_local(settings)
+    today = now.date()
+
+    # Понедельник текущей недели
+    monday = today - timedelta(days=today.weekday())
+    projects_dir = get_user_projects_dir(settings, uid)
+
+    days: dict[date, list[PlanItem]] = {}
+    for offset in range(7):
+        d = monday + timedelta(days=offset)
+        days[d] = _collect_plan_items(projects_dir, storage, d)
+
+    text = format_week_overview(days, now)
+    # Кнопка «назад к сегодня»
+    from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+    markup = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(
+            text="📅 Сегодня",
+            callback_data=f"{PLAN_CB_DAY}{today.isoformat()}",
+        )],
+    ])
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=markup)
+    await callback.answer()
+
+
+def _collect_plan_items(
+    projects_dir: Path,
+    storage: SessionStorage | None,
+    d: date,
+) -> list[PlanItem]:
+    """Собрать элементы плана из всех проектов пользователя на дату."""
+    all_items: list[PlanItem] = []
+
+    # __global__
+    global_dir = projects_dir / "__global__"
+    if global_dir.is_dir():
+        try:
+            all_items.extend(pls.get_by_date(global_dir, d))
+        except InfrastructureError as e:
+            log.warning("plan: ошибка чтения __global__: %s", e)
+
+    # Обычные проекты
+    if storage:
+        for name in storage.list_projects(projects_dir):
+            try:
+                all_items.extend(pls.get_by_date(projects_dir / name, d))
+            except InfrastructureError as e:
+                log.warning("plan: ошибка чтения %s: %s", name, e)
+
+    return all_items
+
+
+# ── /notify (алиас для /plan) ──
 
 @router.message(Command("notify"))
 async def cmd_notify(

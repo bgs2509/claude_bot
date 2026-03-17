@@ -7,6 +7,8 @@ from aiogram.types import (
     ReplyKeyboardMarkup,
 )
 
+from datetime import date, timedelta
+
 from claude_bot.constants import (
     BUTTON_CREATE_PROJECT,
     BUTTON_HOME,
@@ -17,6 +19,8 @@ from claude_bot.constants import (
     EMOJI_INACTIVE,
     EMOJI_MORE,
     EMOJI_SESSION,
+    PLAN_CB_DAY,
+    PLAN_CB_WEEK,
 )
 
 
@@ -171,3 +175,32 @@ def build_project_reply_keyboard(
         resize_keyboard=True,
         is_persistent=True,
     )
+
+
+def build_plan_keyboard(d: date) -> InlineKeyboardMarkup:
+    """Inline-клавиатура навигации для /plan: вчера/завтра/послезавтра/неделя."""
+    yesterday = d - timedelta(days=1)
+    tomorrow = d + timedelta(days=1)
+    after_tomorrow = d + timedelta(days=2)
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text="◀ Вчера",
+                callback_data=f"{PLAN_CB_DAY}{yesterday.isoformat()}",
+            ),
+            InlineKeyboardButton(
+                text="Завтра ▶",
+                callback_data=f"{PLAN_CB_DAY}{tomorrow.isoformat()}",
+            ),
+            InlineKeyboardButton(
+                text="▶▶",
+                callback_data=f"{PLAN_CB_DAY}{after_tomorrow.isoformat()}",
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                text="📅 Неделя",
+                callback_data=PLAN_CB_WEEK,
+            ),
+        ],
+    ])

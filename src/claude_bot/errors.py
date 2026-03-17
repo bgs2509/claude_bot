@@ -41,6 +41,11 @@ USER_MESSAGES: dict[str, str] = {
     "notify_read_error": "Не удалось прочитать файл уведомлений.",
     "notify_parse_error": "Файл уведомлений повреждён.",
     "notify_write_error": "Не удалось сохранить уведомления.",
+    "plan_empty": "На этот день план пуст.",
+    "planner_read_error": "Не удалось прочитать план.",
+    "planner_parse_error": "Файл плана повреждён.",
+    "planner_write_error": "Не удалось сохранить план.",
+    "planner_item_not_found": "Задача не найдена.",
     "unexpected_error": (
         "Произошла непредвиденная ошибка.\n"
         "Попробуй:\n"

@@ -32,9 +32,13 @@ class Settings(BaseSettings):
     analytics_db: Path = Path("data/analytics.db")
     analytics_retention_days: int = 90
 
-    # Уведомления
-    notify_scan_interval: int = 60  # секунды между проверками notify.json
-    notify_timezone: str = "Europe/Moscow"  # часовой пояс времени в notify.json
+    # Уведомления (legacy-имена для обратной совместимости .env)
+    notify_scan_interval: int = 60  # секунды между проверками
+    notify_timezone: str = "Europe/Moscow"  # часовой пояс
+
+    # Планировщик — дайджесты (HH:MM, пустая строка = выкл)
+    plan_morning_time: str = "08:00"
+    plan_evening_time: str = "22:00"
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 
