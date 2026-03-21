@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     claude_timeout: int = 600
     max_upload_size: int = 20_971_520  # 20MB
     users: dict = {}
+    users_file: Path = Path("data/users.json")
 
     # Логирование
     log_file: Path = Path("data/bot.log")
@@ -48,6 +49,13 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             return json.loads(v) if v.strip() else {}
         return v
+
+    @model_validator(mode="after")
+    def load_users_from_file(self) -> "Settings":
+        """Загрузить пользователей из JSON-файла, если USERS пуст."""
+        if not self.users and self.users_file.exists():
+            self.users = json.loads(self.users_file.read_text(encoding="utf-8"))
+        return self
 
     @model_validator(mode="after")
     def validate_users_projects_dir(self) -> "Settings":
