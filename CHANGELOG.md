@@ -9,6 +9,7 @@
 
 ### Changed
 
+- Конфигурация пользователей вынесена из `.env` в отдельный файл `data/users.json`
 - Архитектурный документ skills обновлён: добавлена структура python-ai-skills, symlink-деплой, cross-project workflow
 - Переименование python-ai-guide → python-ai-skills во всей документации
 

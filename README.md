@@ -22,7 +22,7 @@ Telegram-обёртка над Claude Code CLI — превращает Смар
     - 💰 Семья ведёт домашний бюджет
     - ✨ Сценарии ограничены только фантазией
 
-Бот настраивается через `.env`, конфиги MCP-серверов и системные промпты — всё прозрачно для разработчика.
+Бот настраивается через `.env`, `data/users.json`, конфиги MCP-серверов и системные промпты — всё прозрачно для разработчика.
 
 ---
 
@@ -34,7 +34,7 @@ Telegram-обёртка над Claude Code CLI — превращает Смар
 - **Документы** — чтение файлов и обработка содержимого
 - **Проекты и сессии** — управление контекстом через inline-меню (`/menu`): именованные проекты и сессии
 - **MCP серверы** — GitHub, Playwright, Brave Search, PostgreSQL и другие
-- **Мультипользователь** — роли admin/user/readonly, дневные лимиты
+- **Мультипользователь** — роли admin/user/readonly, дневные лимиты, конфигурация в `data/users.json`
 
 ---
 
@@ -44,7 +44,9 @@ Telegram-обёртка над Claude Code CLI — превращает Смар
 git clone <repo-url> claude_bot
 cd claude_bot
 cp .env.example .env
-# Заполни TELEGRAM_BOT_TOKEN и PROJECTS_DIR в .env
+cp users.json.example data/users.json
+# Заполни TELEGRAM_BOT_TOKEN в .env
+# Настрой пользователей в data/users.json
 make install
 make run
 ```
@@ -89,6 +91,7 @@ claude_bot/
 ├── pyproject.toml             # Зависимости и метаданные
 ├── Makefile                   # make run, make install, make clean
 ├── .env.example               # Шаблон переменных окружения
+├── users.json.example         # Шаблон конфигурации пользователей
 ├── claude-bot.service         # Systemd unit для автозапуска
 ├── src/claude_bot/
 │   ├── __main__.py            # Точка входа
