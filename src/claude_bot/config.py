@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     plan_morning_time: str = "08:00"
     plan_evening_time: str = "22:00"
 
-    model_config = {"env_file": ".env", "extra": "ignore"}
+    model_config = {"env_file": ".env", "extra": "ignore", "env_ignore_empty": True}
 
     @field_validator("users", mode="before")
     @classmethod
