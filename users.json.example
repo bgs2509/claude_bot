@@ -4,13 +4,13 @@
         "limit": 0,
         "name": "Admin",
         "model": "opus",
-        "projects_dir": "/home/user/projects"
+        "projects_dir": "/home/user/ai-steward/Admin"
     },
     "987654321": {
         "role": "user",
         "limit": 50,
         "name": "Username",
         "model": "haiku",
-        "projects_dir": "/home/user/other-projects"
+        "projects_dir": "/home/user/ai-steward/Username"
     }
 }

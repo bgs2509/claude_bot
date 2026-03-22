@@ -1,6 +1,6 @@
-# claude_bot
+# ai-steward
 
-Telegram-бот для доступа к Claude Code CLI. Версия 2.0.0.
+Telegram-бот с доступом к AI CLI. Версия 2.0.0.
 
 ## Стек
 
@@ -15,7 +15,7 @@ Telegram-бот для доступа к Claude Code CLI. Версия 2.0.0.
 ## Структура
 
 ```
-src/claude_bot/
+src/ai_steward/
 ├── __main__.py          # Точка входа
 ├── bot.py               # Фабрики create_bot, create_dispatcher
 ├── config.py            # Settings (pydantic-settings)
@@ -23,8 +23,7 @@ src/claude_bot/
 ├── keyboards.py         # Inline-клавиатуры с пагинацией
 ├── handlers/
 │   ├── __init__.py      # Общие хелперы (send_long, send_files)
-│   ├── commands.py      # /help, /menu, /new, /model, /voice, /cancel
-│   ├── menu.py          # Inline callback навигация + FSM
+│   ├── commands.py      # /help, /status, /new, /model, /voice, /cancel
 │   ├── text.py          # Текстовые сообщения
 │   ├── voice.py         # Голосовые сообщения
 │   ├── photo.py         # Фотографии
@@ -52,7 +51,7 @@ src/claude_bot/
 
 ```bash
 make install   # uv sync
-make run       # uv run claude-bot
+make run       # uv run ai-steward
 ```
 
 ## Документация — правила обновления

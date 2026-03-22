@@ -3,7 +3,7 @@
 # Запускать от пользователя claude: bash update.sh
 set -euo pipefail
 
-echo "=== Обновление Claude Code Bot ==="
+echo "=== Обновление AI Steward Bot ==="
 
 # Claude Code
 echo "[1/4] Обновление Claude Code..."
@@ -17,15 +17,15 @@ echo "  Кэш очищен (свежие версии загрузятся пр
 
 # Python зависимости
 echo "[3/4] Обновление Python зависимостей..."
-cd /home/claude/claude-bot
+cd /home/claude/ai-steward
 uv sync --upgrade
 echo "  Зависимости обновлены"
 
 # Перезапуск бота
 echo "[4/4] Перезапуск бота..."
-sudo systemctl restart claude-bot
+sudo systemctl restart ai-steward
 sleep 2
-STATUS=$(systemctl is-active claude-bot)
+STATUS=$(systemctl is-active ai-steward)
 echo "  Статус бота: $STATUS"
 
 echo ""

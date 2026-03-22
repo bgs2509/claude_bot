@@ -1,7 +1,7 @@
 #!/bin/bash
 # Скрипт автоматического бэкапа
 # Использование: bash backup.sh
-# Cron: 0 3 * * * /home/claude/claude-bot/scripts/backup.sh >> /home/claude/backups/backup.log 2>&1
+# Cron: 0 3 * * * /home/claude/ai-steward/scripts/backup.sh >> /home/claude/backups/backup.log 2>&1
 set -euo pipefail
 
 BACKUP_DIR="/home/claude/backups"
@@ -20,7 +20,7 @@ tar czf "$BACKUP_FILE" \
     --exclude='.git' \
     --exclude='node_modules' \
     --exclude='.venv' \
-    /home/claude/claude-bot/ \
+    /home/claude/ai-steward/ \
     /home/claude/projects/ \
     /home/claude/.claude/settings.json \
     2>/dev/null || true

@@ -1,9 +1,9 @@
 #!/bin/bash
-# Скрипт первоначальной настройки VPS для Claude Code Telegram Bot
+# Скрипт первоначальной настройки VPS для AI Steward Telegram Bot
 # Запускать от root: bash setup-server.sh
 set -euo pipefail
 
-echo "=== Настройка VPS для Claude Code Bot ==="
+echo "=== Настройка VPS для AI Steward Bot ==="
 
 # Обновление системы
 echo "[1/8] Обновление системы..."
@@ -83,4 +83,4 @@ echo "1. Настроить SSH ключи: ssh-copy-id claude@$(hostname -I | a
 echo "2. Запустить скрипт безопасности: bash scripts/setup-security.sh"
 echo "3. Переключиться на пользователя: su - claude"
 echo "4. Авторизовать Claude: claude auth login (OAuth через браузер)"
-echo "5. Настроить бота (см. GUIDE.md)"
+echo "5. Настроить бота (см. docs/DEPLOYMENT.md)"

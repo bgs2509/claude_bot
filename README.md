@@ -1,4 +1,4 @@
-# Claude Code Telegram Bot
+# AI Steward — Telegram Bot
 
 Telegram-обёртка над Claude Code CLI — превращает Смартфон в терминал с ИИ.
 
@@ -32,7 +32,7 @@ Telegram-обёртка над Claude Code CLI — превращает Смар
 - **Голос** — распознавание речи (faster-whisper) → Claude → озвучка ответа (edge-tts)
 - **Фото** — OCR (tesseract) → Claude анализирует
 - **Документы** — чтение файлов и обработка содержимого
-- **Проекты и сессии** — управление контекстом через inline-меню (`/menu`): именованные проекты и сессии
+- **Проекты и сессии** — управление контекстом через inline-меню (`/status`): именованные проекты и сессии
 - **MCP серверы** — GitHub, Playwright, Brave Search, PostgreSQL и другие
 - **Мультипользователь** — роли admin/user/readonly, дневные лимиты, конфигурация в `data/users.json`
 
@@ -41,8 +41,8 @@ Telegram-обёртка над Claude Code CLI — превращает Смар
 ## Быстрый старт
 
 ```bash
-git clone <repo-url> claude_bot
-cd claude_bot
+git clone <repo-url> ai-steward
+cd ai-steward
 cp .env.example .env
 cp users.json.example data/users.json
 # Заполни TELEGRAM_BOT_TOKEN в .env
@@ -71,14 +71,13 @@ make run
 | Команда | Описание |
 |---------|----------|
 | `/help` | Справка и список команд |
-| `/menu` | Проекты и сессии (главное меню с кнопками) |
+| `/status` | Проекты и сессии (главное меню с кнопками) |
 | `/new` | Новая сессия (сброс контекста) |
 | `/cancel` | Отменить текущий запрос |
 | `/model` | Сменить модель (haiku / sonnet / opus) |
 | `/voice` | Вкл/выкл голосовые ответы |
-| `/status` | Текущее состояние |
-| `/usage` | Статистика за сегодня |
-| `/stats` | Статистика всех (admin) |
+| `/plan` | План дня |
+| `/notify` | Список уведомлений |
 
 Подробнее — в [docs/USAGE.md](docs/USAGE.md).
 
@@ -87,13 +86,13 @@ make run
 ## Структура проекта
 
 ```
-claude_bot/
+ai-steward/
 ├── pyproject.toml             # Зависимости и метаданные
 ├── Makefile                   # make run, make install, make clean
 ├── .env.example               # Шаблон переменных окружения
 ├── users.json.example         # Шаблон конфигурации пользователей
-├── claude-bot.service         # Systemd unit для автозапуска
-├── src/claude_bot/
+├── ai-steward.service         # Systemd unit для автозапуска
+├── src/ai_steward/
 │   ├── __main__.py            # Точка входа
 │   ├── bot.py                 # Фабрики create_bot / create_dispatcher
 │   ├── config.py              # Settings (pydantic-settings)
@@ -101,15 +100,14 @@ claude_bot/
 │   ├── keyboards.py           # Inline-клавиатуры (главное меню, пагинация)
 │   ├── handlers/
 │   │   ├── commands.py        # Команды бота
-│   │   ├── menu.py            # /menu, проекты, сессии (inline callback)
 │   │   ├── text.py            # Текстовые сообщения
 │   │   ├── voice.py           # Голосовые сообщения
 │   │   ├── photo.py           # Фотографии
 │   │   └── document.py        # Документы
 │   ├── middlewares/
-│   │   └── auth.py            # Авторизация + check_limit
+│   │   └── auth.py            # Авторизация + rate-limit
 │   └── services/
-│       ├── claude.py          # ClaudeResponse, run_claude, send_long
+│       ├── claude.py          # ClaudeResponse, run_claude
 │       ├── format_telegram.py # Markdown → Telegram HTML
 │       ├── speech.py          # transcribe_voice, synthesize_speech
 │       ├── ocr.py             # ocr_image
@@ -118,15 +116,7 @@ claude_bot/
 ├── CLAUDE.md                 # Инструкции для Claude Code
 ├── docs/
 │   ├── adr/                  # Архитектурные решения (ADR)
-│   │   ├── README.md         # Индекс и шаблон
-│   │   ├── 001-aiogram.md
-│   │   ├── 002-claude-code-cli.md
-│   │   ├── 003-faster-whisper.md
-│   │   ├── 004-edge-tts.md
-│   │   ├── 005-tesseract.md
-│   │   ├── 006-modular-architecture.md
-│   │   ├── 007-pydantic-settings.md
-│   │   └── 008-uv.md
+│   │   └── README.md         # Индекс и шаблон
 │   ├── USAGE.md               # Руководство пользователя
 │   └── DEPLOYMENT.md          # Развёртывание и администрирование
 └── scripts/

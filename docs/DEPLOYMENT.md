@@ -163,7 +163,7 @@ echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 
 ```bash
 # На ЛОКАЛЬНОЙ машине (не на VPS)
-ssh-keygen -t ed25519 -C "claude-bot-vps"
+ssh-keygen -t ed25519 -C "ai-steward-vps"
 ssh-copy-id -i ~/.ssh/id_ed25519.pub claude@ВАШ_IP
 ```
 
@@ -299,7 +299,7 @@ cp configs/claude-settings.json ~/.claude/settings.json
 
 ## 6. Код Telegram-бота
 
-Код бота в `src/claude_bot/` — модульная структура с разделением на конфиг, состояние, сервисы, middleware и хендлеры.
+Код бота в `src/ai_steward/` — модульная структура с разделением на конфиг, состояние, сервисы, middleware и хендлеры.
 
 ### Основные возможности
 
@@ -315,7 +315,7 @@ cp configs/claude-settings.json ~/.claude/settings.json
 ### Установка зависимостей
 
 ```bash
-cd /home/claude/claude-bot
+cd /home/claude/ai-steward
 make install
 # Или: uv sync
 ```
@@ -588,7 +588,7 @@ MCP (Model Context Protocol) — плагины, расширяющие возм
 
 ### Unit файл
 
-Файл `/etc/systemd/system/claude-bot.service`:
+Файл `/etc/systemd/system/ai-steward.service`:
 
 ```ini
 [Unit]
@@ -600,13 +600,13 @@ Wants=network-online.target
 Type=simple
 User=claude
 Group=claude
-WorkingDirectory=/home/claude/claude-bot
-ExecStart=/home/claude/.local/bin/uv run --project /home/claude/claude-bot claude-bot
+WorkingDirectory=/home/claude/ai-steward
+ExecStart=/home/claude/.local/bin/uv run --project /home/claude/ai-steward ai-steward
 Restart=always
 RestartSec=10
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=claude-bot
+SyslogIdentifier=ai-steward
 
 # Безопасность
 NoNewPrivileges=yes
@@ -622,24 +622,24 @@ WantedBy=multi-user.target
 
 ```bash
 # Установить и запустить
-sudo cp claude-bot.service /etc/systemd/system/
+sudo cp ai-steward.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable claude-bot
-sudo systemctl start claude-bot
+sudo systemctl enable ai-steward
+sudo systemctl start ai-steward
 
 # Проверить статус
-sudo systemctl status claude-bot
+sudo systemctl status ai-steward
 
 # Логи
-sudo journalctl -u claude-bot -f              # Следить в реальном времени
-sudo journalctl -u claude-bot --since today    # За сегодня
-sudo journalctl -u claude-bot -n 100           # Последние 100 строк
+sudo journalctl -u ai-steward -f              # Следить в реальном времени
+sudo journalctl -u ai-steward --since today    # За сегодня
+sudo journalctl -u ai-steward -n 100           # Последние 100 строк
 
 # Перезапуск
-sudo systemctl restart claude-bot
+sudo systemctl restart ai-steward
 
 # Остановка
-sudo systemctl stop claude-bot
+sudo systemctl stop ai-steward
 ```
 
 ---
@@ -650,11 +650,11 @@ sudo systemctl stop claude-bot
 
 | Что | Путь | Важность |
 |-----|------|----------|
-| Код бота | `/home/claude/claude-bot/` | Средняя (есть в git) |
+| Код бота | `/home/claude/ai-steward/` | Средняя (есть в git) |
 | Проекты | `/home/claude/projects/` | Высокая |
 | Конфиги Claude | `~/.claude/` | Высокая |
-| Env файл | `/home/claude/claude-bot/.env` | Критическая |
-| Systemd unit | `/etc/systemd/system/claude-bot.service` | Низкая (легко воссоздать) |
+| Env файл | `/home/claude/ai-steward/.env` | Критическая |
+| Systemd unit | `/etc/systemd/system/ai-steward.service` | Низкая (легко воссоздать) |
 
 ### Скрипт автоматического бэкапа
 
@@ -664,7 +664,7 @@ sudo systemctl stop claude-bot
 # Добавить в cron (ежедневно в 3:00)
 crontab -e
 # Добавить строку:
-0 3 * * * /home/claude/claude-bot/scripts/backup.sh >> /home/claude/backups/backup.log 2>&1
+0 3 * * * /home/claude/ai-steward/scripts/backup.sh >> /home/claude/backups/backup.log 2>&1
 ```
 
 ### Восстановление на новом VPS
@@ -679,12 +679,12 @@ cd /home/claude
 tar xzf backup-YYYY-MM-DD.tar.gz
 
 # 4. Установить зависимости
-cd claude-bot
+cd ai-steward
 uv sync
 
 # 5. Запустить
-sudo systemctl enable claude-bot
-sudo systemctl start claude-bot
+sudo systemctl enable ai-steward
+sudo systemctl start ai-steward
 ```
 
 ---
@@ -698,7 +698,7 @@ sudo systemctl start claude-bot
 ```bash
 # Добавить в cron (каждые 5 минут)
 crontab -e
-*/5 * * * * /home/claude/claude-bot/scripts/healthcheck.sh
+*/5 * * * * /home/claude/ai-steward/scripts/healthcheck.sh
 ```
 
 ### Что мониторится
@@ -724,7 +724,7 @@ crontab -e
 ```bash
 npm update -g @anthropic-ai/claude-code
 claude --version  # Проверить новую версию
-sudo systemctl restart claude-bot
+sudo systemctl restart ai-steward
 ```
 
 ### Обновление MCP серверов
@@ -732,20 +732,20 @@ sudo systemctl restart claude-bot
 ```bash
 # Очистить кэш npx (скачает свежие версии при следующем запуске)
 npx clear-npx-cache
-sudo systemctl restart claude-bot
+sudo systemctl restart ai-steward
 ```
 
 ### Обновление бота
 
 ```bash
-cd /home/claude/claude-bot
+cd /home/claude/ai-steward
 # Если бот в git
 git pull
 
 # Обновить зависимости
 uv sync --upgrade
 
-sudo systemctl restart claude-bot
+sudo systemctl restart ai-steward
 ```
 
 ### Обновление системы
@@ -768,17 +768,17 @@ sudo reboot
 
 ```bash
 # 1. Проверить статус
-sudo systemctl status claude-bot
+sudo systemctl status ai-steward
 
 # 2. Посмотреть логи
-sudo journalctl -u claude-bot -n 50
+sudo journalctl -u ai-steward -n 50
 
 # 3. Проверить что claude работает
 su - claude
 claude -p "test" --output-format text
 
 # 4. Перезапустить
-sudo systemctl restart claude-bot
+sudo systemctl restart ai-steward
 ```
 
 ### Claude Code не авторизуется
@@ -936,7 +936,7 @@ bash scripts/setup-local.sh
 ### Шаг 2: Установить зависимости
 
 ```bash
-cd /home/bgs/Henry_Bud_GitHub/claude_bot
+cd /home/bgs/ai-steward/Gena_Beeline_Local/ai-steward
 make install
 # Или: uv sync
 ```
@@ -956,7 +956,7 @@ nano .env  # или любой редактор
 ### Шаг 4: Запустить
 
 ```bash
-cd /home/bgs/Henry_Bud_GitHub/claude_bot
+cd /home/bgs/ai-steward/Gena_Beeline_Local/ai-steward
 make run
 ```
 
@@ -972,19 +972,19 @@ make run
 
 ```bash
 # Вариант 1: nohup
-cd /home/bgs/Henry_Bud_GitHub/claude_bot
-nohup uv run claude-bot > bot.log 2>&1 &
+cd /home/bgs/ai-steward/Gena_Beeline_Local/ai-steward
+nohup uv run ai-steward > bot.log 2>&1 &
 echo $! > bot.pid
 
 # Остановить
 kill $(cat bot.pid)
 
 # Вариант 2: tmux/screen
-tmux new -s claude-bot
-cd /home/bgs/Henry_Bud_GitHub/claude_bot
+tmux new -s ai-steward
+cd /home/bgs/ai-steward/Gena_Beeline_Local/ai-steward
 make run
 # Ctrl+B, D — отключиться от сессии
-# tmux attach -t claude-bot — вернуться
+# tmux attach -t ai-steward — вернуться
 ```
 
 ### Когда переезжать на VPS
@@ -1018,7 +1018,7 @@ npm install -g @anthropic-ai/claude-code
 claude auth login
 
 # 5. Запустить бота
-git clone <repo-url> ~/claude-bot && cd ~/claude-bot
+git clone <repo-url> ~/ai-steward && cd ~/ai-steward
 cp .env.example .env
 # Настроить .env
 make install

@@ -1,6 +1,6 @@
 # Architecture Decision Records (ADR)
 
-Архитектурные решения проекта claude_bot.
+Архитектурные решения проекта ai-steward.
 
 ## Формат
 

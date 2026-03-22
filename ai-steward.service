@@ -1,0 +1,25 @@
+[Unit]
+Description=AI Steward Telegram Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bgs
+Group=bgs
+WorkingDirectory=/opt/ai-steward
+ExecStart=/home/bgs/.local/bin/uv run --project /opt/ai-steward ai-steward
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ai-steward
+
+# Безопасность
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/opt/ai-steward /home/bgs
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

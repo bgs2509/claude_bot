@@ -5,19 +5,19 @@ help:  ## Показать справку
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
 
 run:  ## Запустить бота
-	uv run claude-bot
+	uv run ai-steward
 
 install:  ## Установить зависимости
 	uv sync
 
 vps:  ## Установить и перезапустить systemd-сервис
-	sudo cp claude-bot.service /etc/systemd/system/
+	sudo cp ai-steward.service /etc/systemd/system/
 	sudo systemctl daemon-reload
-	sudo systemctl enable claude-bot
-	sudo systemctl restart claude-bot
+	sudo systemctl enable ai-steward
+	sudo systemctl restart ai-steward
 
 logs-vps:  ## Логи systemd-сервиса (follow)
-	sudo journalctl -u claude-bot -f
+	sudo journalctl -u ai-steward -f
 
 clean:  ## Удалить кэш и .venv
 	rm -rf .venv

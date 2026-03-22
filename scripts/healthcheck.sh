@@ -1,6 +1,6 @@
 #!/bin/bash
 # Healthcheck скрипт — проверяет работоспособность и отправляет алерты
-# Cron: */5 * * * * /home/claude/claude-bot/scripts/healthcheck.sh
+# Cron: */5 * * * * /home/claude/ai-steward/scripts/healthcheck.sh
 set -euo pipefail
 
 # Настройки (заполнить)
@@ -20,12 +20,12 @@ send_alert() {
 ALERTS=""
 
 # Проверка 1: Бот запущен
-if ! systemctl is-active --quiet claude-bot; then
-    ALERTS+="🔴 claude-bot НЕ запущен!\n"
+if ! systemctl is-active --quiet ai-steward; then
+    ALERTS+="🔴 ai-steward НЕ запущен!\n"
     # Попытка перезапуска
-    sudo systemctl restart claude-bot 2>/dev/null
+    sudo systemctl restart ai-steward 2>/dev/null
     sleep 3
-    if systemctl is-active --quiet claude-bot; then
+    if systemctl is-active --quiet ai-steward; then
         ALERTS+="🟢 Перезапуск успешен\n"
     else
         ALERTS+="🔴 Перезапуск НЕ удался\n"

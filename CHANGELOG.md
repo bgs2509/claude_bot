@@ -9,6 +9,10 @@
 
 ### Changed
 
+- Проект переименован: `claude_bot` → `ai-steward` (Python-пакет: `ai_steward`)
+- Entry point: `claude-bot` → `ai-steward`
+- Systemd-сервис: `claude-bot.service` → `ai-steward.service`
+- Воркспейсы пользователей перенесены в `/home/bgs/ai-steward/`
 - Конфигурация пользователей вынесена из `.env` в отдельный файл `data/users.json`
 - Архитектурный документ skills обновлён: добавлена структура python-ai-skills, symlink-деплой, cross-project workflow
 - Переименование python-ai-guide → python-ai-skills во всей документации
@@ -101,7 +105,7 @@
 
 ### Added
 
-- Модульная архитектура `src/claude_bot/` (handlers, services, middlewares)
+- Модульная архитектура `src/ai_steward/` (handlers, services, middlewares)
 - `pyproject.toml` с метаданными и зависимостями
 - `pydantic-settings` для валидации конфигурации через `.env`
 - `AuthMiddleware` — авторизация, роли, дневные лимиты

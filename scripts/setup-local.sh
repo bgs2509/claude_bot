@@ -5,7 +5,7 @@ set -euo pipefail
 
 BOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
-echo "=== Локальная установка Claude Code Bot ==="
+echo "=== Локальная установка AI Steward Bot ==="
 echo "Директория: $BOT_DIR"
 echo ""
 
@@ -70,4 +70,4 @@ echo "  cd $BOT_DIR"
 echo "  make run"
 echo ""
 echo "Или напрямую:"
-echo "  uv run claude-bot"
+echo "  uv run ai-steward"
