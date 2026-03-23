@@ -7,8 +7,20 @@
 
 ## [Unreleased]
 
+### Added
+
+- Четырёхуровневая иерархия CLAUDE.md: глобальный → ai-steward → юзер → проект (TASK-004)
+- Профили пользователей (Tania, Dari, Marat, Gena_MTS) с адаптацией стиля общения (TASK-004)
+- Дневник здоровья для Tania с ежедневным чек-ином (TASK-004)
+- Dev-правила вынесены в `~/.claude/rules/python-dev.md` (TASK-004)
+- Шаблоны 10 типов проектов (Health, Investment, Budget, Family, Study, Career, Home, Hobby, Dev) в ai-steward/CLAUDE.md (TASK-004)
+- Директория `templates/` с мануалами по инициализации машин, юзеров и проектов (TASK-004)
+
 ### Changed
 
+- Глобальный `~/.claude/CLAUDE.md` сокращён с 284 до 35 строк — dev-специфика вынесена в rules (TASK-004)
+- `Gena_Beeline_VPN-0/CLAUDE.md` переписан: убрана дублирующая спецификация planner.json, добавлен профиль пользователя (TASK-004)
+- Спецификация planner.json перенесена на уровень `ai-steward/CLAUDE.md` как единый источник правды (TASK-004)
 - Проект переименован: `claude_bot` → `ai-steward` (Python-пакет: `ai_steward`)
 - Entry point: `claude-bot` → `ai-steward`
 - Systemd-сервис: `claude-bot.service` → `ai-steward.service`
