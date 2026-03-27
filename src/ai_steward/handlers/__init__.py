@@ -15,6 +15,7 @@ from ai_steward.errors import get_user_message
 from ai_steward.keyboards import build_project_reply_keyboard
 from ai_steward.services.claude import ClaudeResponse, run_claude
 from ai_steward.services.format_telegram import markdown_to_telegram_html
+from ai_steward.services.pdf import text_to_pdf
 from ai_steward.services.speech import synthesize_speech
 from ai_steward.state import AppState
 
@@ -104,14 +105,12 @@ async def send_long(
     preview = text[:max_len]
     await _send_html_or_plain(message, preview, project_tag=project_tag)
 
-    md_path = tempfile.mktemp(suffix=".md")
-    with open(md_path, "w", encoding="utf-8") as f:
-        f.write(text)
-    doc = FSInputFile(md_path, filename="response.md")
+    pdf_path = text_to_pdf(text)
+    doc = FSInputFile(pdf_path, filename="response.pdf")
     await message.answer_document(
         doc, caption="Полный ответ в файле", reply_markup=reply_markup,
     )
-    os.unlink(md_path)
+    os.unlink(pdf_path)
 
 
 async def send_files(message: types.Message, files: list[Path]) -> None:
