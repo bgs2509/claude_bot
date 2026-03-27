@@ -9,6 +9,13 @@ FONT_BOLD_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 FONT_MONO_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"
 
 
+def _safe_multi_cell(pdf: FPDF, h: float, text: str) -> None:
+    """Write multi_cell with X reset to left margin to avoid width errors."""
+    pdf.set_x(pdf.l_margin)
+    w = pdf.w - pdf.l_margin - pdf.r_margin
+    pdf.multi_cell(w, h, text)
+
+
 def text_to_pdf(text: str) -> str:
     """Convert plain/markdown text to PDF, return temp file path."""
     pdf = FPDF()
@@ -23,18 +30,22 @@ def text_to_pdf(text: str) -> str:
     pdf.set_font("DejaVu", size=11)
 
     for line in text.split("\n"):
+        # Empty lines
+        if not line.strip():
+            pdf.ln(4)
+            continue
         # Headers
         if line.startswith("### "):
             pdf.set_font("DejaVu", "B", 12)
-            pdf.multi_cell(0, 6, line[4:])
+            _safe_multi_cell(pdf, 6, line[4:])
             pdf.ln(2)
         elif line.startswith("## "):
             pdf.set_font("DejaVu", "B", 13)
-            pdf.multi_cell(0, 7, line[3:])
+            _safe_multi_cell(pdf, 7, line[3:])
             pdf.ln(2)
         elif line.startswith("# "):
             pdf.set_font("DejaVu", "B", 15)
-            pdf.multi_cell(0, 8, line[2:])
+            _safe_multi_cell(pdf, 8, line[2:])
             pdf.ln(3)
         # Code block markers
         elif line.startswith("```"):
@@ -42,12 +53,10 @@ def text_to_pdf(text: str) -> str:
         # Bullet points
         elif line.startswith("- ") or line.startswith("* "):
             pdf.set_font("DejaVu", size=11)
-            pdf.multi_cell(0, 6, "  \u2022 " + line[2:])
+            _safe_multi_cell(pdf, 6, "  \u2022 " + line[2:])
         else:
             pdf.set_font("DejaVu", size=11)
-            pdf.multi_cell(0, 6, line if line.strip() else "")
-            if not line.strip():
-                pdf.ln(2)
+            _safe_multi_cell(pdf, 6, line)
 
     path = tempfile.mktemp(suffix=".pdf")
     pdf.output(path)
