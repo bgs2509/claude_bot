@@ -98,12 +98,6 @@ if [[ "$MODE" == "alert" ]]; then
 
     (( SEC_UPDATES > 0 )) && ALERTS+=("📦 Обновлений безопасности: ${SEC_UPDATES}")
 
-    if (( DAYS_LEFT <= 5 && DAYS_LEFT >= 0 )); then
-        ALERTS+=("💳 Оплата через ${DAYS_LEFT} дн. (до ${PAID_UNTIL})")
-    elif (( DAYS_LEFT < 0 )); then
-        ALERTS+=("🔴 Оплата просрочена!")
-    fi
-
     # Отправка
     if (( ${#ALERTS[@]} > 0 )); then
         MSG="🚨 <b>Alert: $(hostname)</b>"
